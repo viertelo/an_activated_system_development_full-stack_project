@@ -42,9 +42,10 @@ export default function LoginPage() {
       }
 
       alert('登录成功！');
-      // 实际项目中可在此处将 token 存入 localStorage/Cookie 并跳转
-      // localStorage.setItem('token', data.token);
-      // router.push('/dashboard');
+      if (data.userId) {
+        localStorage.setItem('user', JSON.stringify({ userId: data.userId, role: data.role }));
+      }
+      router.push('/admin');
       
     } catch (err: any) {
       setError(err.message || '系统内部错误，请稍后重试。');

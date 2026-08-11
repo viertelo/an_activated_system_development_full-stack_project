@@ -50,6 +50,15 @@ namespace backend.Controllers
             };
 
             _context.Users.Add(user);
+            
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "UserRegister",
+                Operator = dto.Email,
+                Target = $"UserId:{user.Id}",
+                IsSuccess = true
+            });
+
             await _context.SaveChangesAsync();
 
             // 发送确认邮件
@@ -91,10 +100,32 @@ namespace backend.Controllers
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email && u.PasswordHash == hashedPw);
 
             if (user == null)
+            {
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    Action = "UserLogin",
+                    Operator = dto.Email,
+                    Target = "System",
+                    IsSuccess = false,
+                    Details = "邮箱或密码错误"
+                });
+                await _context.SaveChangesAsync();
                 return Unauthorized(new { Message = "邮箱或密码错误。" });
+            }
 
             if (!user.IsEmailVerified)
+            {
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    Action = "UserLogin",
+                    Operator = dto.Email,
+                    Target = $"UserId:{user.Id}",
+                    IsSuccess = false,
+                    Details = "邮箱未验证"
+                });
+                await _context.SaveChangesAsync();
                 return Unauthorized(new { Message = "必须确认邮箱后才能开通账户并登录。" });
+            }
 
             // 如果用户开启了 2FA，必须校验二步验证码
             if (user.IsTwoFactorEnabled)
@@ -102,6 +133,15 @@ namespace backend.Controllers
                 if (string.IsNullOrEmpty(dto.TwoFactorCode) || 
                     !_authService.ValidateTwoFactorCode(user.TwoFactorSecret!, dto.TwoFactorCode))
                 {
+                    _context.AuditLogs.Add(new AuditLog
+                    {
+                        Action = "UserLogin",
+                        Operator = dto.Email,
+                        Target = $"UserId:{user.Id}",
+                        IsSuccess = false,
+                        Details = "二步验证码(2FA)无效或未提供"
+                    });
+                    await _context.SaveChangesAsync();
                     return Unauthorized(new { Message = "二步验证码(2FA)无效或未提供。" });
                 }
             }
@@ -141,6 +181,87 @@ namespace backend.Controllers
                 Secret = secret,
                 QrCodeUri = setupUri 
             });
+        }
+
+        public class ForgotPasswordDto
+        {
+            public string Email { get; set; } = string.Empty;
+        }
+
+        public class ResetPasswordDto
+        {
+            public string Token { get; set; } = string.Empty;
+            public string NewPassword { get; set; } = string.Empty;
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            if (user == null)
+            {
+                // 安全原则：即使用户不存在也返回成功，防止邮箱探测攻击
+                return Ok(new { Message = "如果您的邮箱已注册，密码重置链接已发送到该邮箱。" });
+            }
+
+            var token = _authService.GenerateEmailVerificationToken(); // 复用 Token 生成逻辑
+            user.PasswordResetToken = token;
+            user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+            
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "ForgotPassword",
+                Operator = dto.Email,
+                Target = $"UserId:{user.Id}",
+                IsSuccess = true,
+                Details = "请求找回密码"
+            });
+
+            await _context.SaveChangesAsync();
+
+            var resetLink = $"http://{Request.Host}/api/auth/reset-password?token={token}";
+            var htmlBody = $"<h3>账户密码重置</h3><p>系统收到了您的密码重置请求。</p><p>请点击下方链接重置您的密码（链接在1小时内有效）：</p><p><a href='{resetLink}'>点击重置密码</a></p><p>如果这不是您的操作，请忽略此邮件，您的账户是安全的。</p>";
+            
+            await _emailService.SendEmailAsync(user.Email, "您的密码重置链接", htmlBody);
+
+            return Ok(new { Message = "如果您的邮箱已注册，密码重置链接已发送到该邮箱。" });
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.PasswordResetToken == dto.Token);
+            
+            if (user == null || user.PasswordResetTokenExpiry < DateTime.UtcNow)
+            {
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    Action = "ResetPassword",
+                    Operator = "Unknown",
+                    Target = "Token Validation",
+                    IsSuccess = false,
+                    Details = "无效或过期的密码重置链接"
+                });
+                await _context.SaveChangesAsync();
+                return BadRequest(new { Message = "重置链接无效或已过期。" });
+            }
+
+            user.PasswordHash = HashPassword(dto.NewPassword);
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpiry = null;
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "ResetPassword",
+                Operator = user.Email,
+                Target = $"UserId:{user.Id}",
+                IsSuccess = true,
+                Details = "成功重置密码"
+            });
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "密码已成功重置，您现在可以使用新密码登录。" });
         }
 
         // 简易哈希函数 (与前端传来的明文做 Hash 匹配)

@@ -1,14 +1,48 @@
 # 局域网环境完整部署与安全指南 (LAN Deployment & Security Guide)
 
-本文档旨在为您提供详尽的商业激活系统部署指引，特别是针对**局域网（LAN）内的 PostgreSQL 服务器部署**。由于您的核心诉求是**“极低硬件性能占用”**和**“绝对安全”**，请严格按照以下规范进行配置。
+本文档旨在为您提供详尽的商业激活系统部署指引，特别是针对**局域网（LAN）内部署测试**。
+
+> [!TIP]
+> **🎉 V2.0 全新极简局域网部署方案**
+> 在最新版本中，我们为您提供了**一键式的局域网专属配置**。您**完全不需要**再手动配置复杂的 PostgreSQL 监听或 Nginx SSL 证书。
+>
+> 所有的环境隔离、数据库初始化和纯 HTTP 代理都已经封装在了 `docker-compose.lan.yml` 和 `frontend/nginx.lan.conf` 中。
 
 ---
 
-## 1. PostgreSQL 数据库局域网部署指南
+## 1. 极速部署指南 (推荐)
 
-PostgreSQL 是一款性能优异且极度安全的开源关系型数据库。在局域网服务器上部署时，请遵循以下步骤以兼顾轻量化和高安全性。
+如果您只是想在局域网内快速跑起项目进行测试（无需外网域名、无需 HTTPS）：
 
-### 1.1 环境要求
+1. **准备环境文件**：
+   在项目根目录，直接复制我们为您准备好的局域网专属配置模板：
+   ```bash
+   # Windows PowerShell
+   Copy-Item .env.lan.example .env.lan
+   # Linux/macOS
+   cp .env.lan.example .env.lan
+   ```
+
+2. **一键启动**：
+   在根目录下运行以下命令，系统将自动读取专属配置并进行纯内网安全的构建和启动：
+   ```bash
+   docker-compose -f docker-compose.lan.yml --env-file .env.lan up -d --build
+   ```
+
+3. **访问系统**：
+   打开浏览器，访问 `http://<您的局域网IP>:8080` 即可直接使用完整的前后端系统。
+
+> 这套配置使用了完全独立的 Docker 网络 (`activation_net_lan`) 和数据卷 (`pgdata_lan`)，即使将来您在同一台机器上运行生产外网版，两者也**绝对不会发生任何冲突**。
+
+---
+
+## 2. 传统手动 PostgreSQL 局域网部署 (进阶/底层原理)
+
+*如果您希望抛弃 Docker，在一台裸机上手动搭建底层环境，请遵循以下步骤。*
+
+PostgreSQL 是一款性能优异且极度安全的开源关系型数据库。在局域网服务器上手动部署时，请遵循以下步骤以兼顾轻量化和高安全性。
+
+### 2.1 环境要求
 - **操作系统**：推荐使用轻量的 Linux 发行版（如 Debian 或 Ubuntu Server），因为它们不带图形界面，内存占用极低（512MB RAM 即可运行基础库）。如果只能使用 Windows Server，请关闭不必要的后台服务。
 - **硬件消耗**：PostgreSQL 自身占用极小，非常符合您“对硬件性能要求越低越好”的需求。
 
@@ -139,7 +173,14 @@ server {
 在我们的 Docker 容器化部署架构中，最安全且轻量的方案是**利用 Docker 自动读取系统和目录级别的环境变量**，这完全等同于 `.env` 的效果，且绝对安全。
 
 **在 Linux 服务器上运行前：**
-您必须在项目根目录（`docker-compose.yml` 所在的同一级）创建一个名为 `.env` 的隐藏文件，并在其中写入密码：
+您必须在项目根目录（`docker-compose.yml` 所在的同一级）创建一个名为 `.env` 的隐藏文件，并在其中写入密码。
+
+**同时，对于局域网或本地测试，您必须生成 SSL 测试证书，否则 Nginx 将会崩溃：**
+在根目录执行一键生成脚本：
+- Linux / macOS: `bash generate-ssl.sh`
+- Windows: `.\generate-ssl.ps1`
+- 生产环境下，请将正规机构颁发的 `cert.pem` 和 `key.pem` 放入根目录的 `ssl` 文件夹中。
+
 ```env
 # /an_activated_system_development_full-stack_project/.env
 
@@ -168,10 +209,21 @@ DB_USER=activate_admin
 DB_PASSWORD=您的超强数据库密码123!
 
 # ================================
-# 系统安全配置
+# 系统安全与初始管理员配置
 # ================================
 # JWT 鉴权秘钥
 JWT_SECRET=随机生成的超长复杂秘钥串
+# 初始管理员账号
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_PASSWORD=极高强度管理员密码
+
+# ================================
+# 邮件发送 (SMTP) 服务器配置
+# ================================
+SMTP_HOST=smtp.your-email-provider.com
+SMTP_PORT=465
+SMTP_USER=no-reply@yourdomain.com
+SMTP_PASS=your_smtp_auth_code
 ```
 
 当您运行 `docker-compose up -d` 时，Docker 会自动读取这个 `.env` 文件，并在内存中把密码分别注入给 PostgreSQL 和 C# 后端容器。

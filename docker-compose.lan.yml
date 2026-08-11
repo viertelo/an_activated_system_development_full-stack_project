@@ -3,33 +3,27 @@ version: '3.8'
 services:
   db:
     image: postgres:15-alpine
-    container_name: activation_db
+    container_name: activation_db_lan
     environment:
       POSTGRES_USER: ${DB_USER:-activate_admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-YourSuperSecretPassword}
       POSTGRES_DB: ${DB_NAME:-activation_db}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_lan:/var/lib/postgresql/data
     networks:
-      - activation_net
+      - activation_net_lan
     restart: unless-stopped
-    # 同样不暴露 5432 端口到宿主机，保障数据库绝对安全
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: activation_backend
+    container_name: activation_backend_lan
     environment:
-      # 所有的数据库连接信息都可以通过外层 .env 文件注入，实现完全的配置与代码解耦
       ConnectionStrings__DefaultConnection: "Host=${DB_HOST:-db};Port=${DB_PORT:-5432};Database=${DB_NAME:-activation_db};Username=${DB_USER:-activate_admin};Password=${DB_PASSWORD:-YourSuperSecretPassword}"
       JwtSettings__SecretKey: ${JWT_SECRET:-YourSuperSecretKeyGeneratedHere}
-      
-      # 初始化管理员配置 (直接从 .env 读取)
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      
-      # 邮件发送 (SMTP) 配置 (直接从 .env 读取)
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-465}
       SMTP_USER: ${SMTP_USER}
@@ -37,33 +31,28 @@ services:
     depends_on:
       - db
     networks:
-      - activation_net
+      - activation_net_lan
     restart: unless-stopped
-    # 不暴露 5000 端口，黑客无法直接扫到该端口，全靠 Nginx 内部网络代理
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: activation_frontend
+    container_name: activation_frontend_lan
     ports:
-      # 可在 .env 中自定义暴露的端口，默认 80 和 443
       - "${FRONTEND_HTTP_PORT:-80}:80"
-      - "${FRONTEND_HTTPS_PORT:-443}:443" 
     volumes:
-      # 在此处挂载宿主机上的 SSL 证书到容器内
-      # 请确保宿主机的 ./ssl 目录下存在 cert.pem 和 key.pem
-      - ./ssl:/etc/nginx/ssl:ro
+      # 挂载专为局域网无 HTTPS 设计的配置文件，覆盖默认的 nginx.conf
+      - ./frontend/nginx.lan.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - backend
     networks:
-      - activation_net
+      - activation_net_lan
     restart: unless-stopped
 
 networks:
-  activation_net:
+  activation_net_lan:
     driver: bridge
 
 volumes:
-  # 用于永久保存 PostgreSQL 的数据，防止容器重启导致激活码丢失
-  pgdata:
+  pgdata_lan:

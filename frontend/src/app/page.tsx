@@ -90,9 +90,13 @@ export default function LoginPage() {
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   密码
                 </label>
-                <div className="text-sm">
+                <div className="text-sm flex space-x-3">
+                  <Link href="/forgot-password" className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400">
+                    忘记密码
+                  </Link>
+                  <span className="text-gray-300 dark:text-gray-600">|</span>
                   <Link href="/forgot-license" className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400">
-                    忘记激活码 / 密码?
+                    忘记激活码
                   </Link>
                 </div>
               </div>

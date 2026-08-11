@@ -25,17 +25,48 @@ builder.Services.AddCors(options =>
 // 添加全局限流策略 (Rate Limiting)
 builder.Services.AddRateLimiter(options =>
 {
+    // 默认全局策略
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? httpContext.Request.Headers.Host.ToString(),
             factory: partition => new FixedWindowRateLimiterOptions
             {
                 AutoReplenishment = true,
-                PermitLimit = 5, // 每分钟允许 5 次请求
+                PermitLimit = 30, // 全局：每分钟允许 30 次请求
                 QueueLimit = 0,
                 Window = TimeSpan.FromMinutes(1)
             }));
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            
+    // 激活专用高限流策略：防爆破攻击
+    options.AddPolicy("ActivationPolicy", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? httpContext.Request.Headers.Host.ToString(),
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 5, // 激活：每分钟仅允许 5 次请求
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+            
+    options.OnRejected = async (context, token) =>
+    {
+        var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown IP";
+        var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+        db.AuditLogs.Add(new backend.Models.AuditLog
+        {
+            Action = "RateLimitBlocked",
+            Operator = ip,
+            Target = context.HttpContext.Request.Path.Value ?? "Unknown",
+            IsSuccess = false,
+            Details = "风控：触发IP高频请求限制",
+            Timestamp = System.DateTime.UtcNow
+        });
+        await db.SaveChangesAsync(token);
+        
+        context.HttpContext.Response.StatusCode = 429;
+        await context.HttpContext.Response.WriteAsync("请求过于频繁，已被风控拦截，请稍后重试。", cancellationToken: token);
+    };
 });
 
 // 配置 Entity Framework Core 及 PostgreSQL（此处为连接字符串占位，供本地部署时填充）
@@ -49,6 +80,7 @@ builder.Services.AddScoped<LicenseService>();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddSingleton<RsaKeyService>();
 
 var app = builder.Build();
 
@@ -56,7 +88,34 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    // db.Database.EnsureCreated();
+    db.Database.Migrate();
+
+    // 自动根据环境变量创建初始管理员
+    var adminEmail = builder.Configuration["ADMIN_EMAIL"];
+    var adminPassword = builder.Configuration["ADMIN_PASSWORD"];
+
+    if (!string.IsNullOrEmpty(adminEmail) && !string.IsNullOrEmpty(adminPassword))
+    {
+        if (!db.Users.Any(u => u.Email == adminEmail))
+        {
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(adminPassword);
+            var hash = sha256.ComputeHash(bytes);
+            var passwordHash = Convert.ToBase64String(hash);
+
+            var adminUser = new backend.Models.User
+            {
+                Email = adminEmail,
+                PasswordHash = passwordHash,
+                Role = "Admin",
+                IsEmailVerified = true // 管理员默认已验证邮箱
+            };
+            db.Users.Add(adminUser);
+            db.SaveChanges();
+            Console.WriteLine($"[Setup] Admin user created: {adminEmail}");
+        }
+    }
 }
 
 // Configure the HTTP request pipeline.

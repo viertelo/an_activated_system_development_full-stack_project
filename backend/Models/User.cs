@@ -32,6 +32,11 @@ namespace backend.Models
         public string? EmailVerificationToken { get; set; }
         public DateTime? EmailTokenExpiry { get; set; }
 
+        // === 密码找回支持 ===
+        [MaxLength(255)]
+        public string? PasswordResetToken { get; set; }
+        public DateTime? PasswordResetTokenExpiry { get; set; }
+
         // === 2FA (两步验证) 支持 ===
         public bool IsTwoFactorEnabled { get; set; } = false;
         

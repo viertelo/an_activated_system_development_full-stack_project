@@ -12,6 +12,7 @@ namespace backend.Controllers
         private readonly AdminService _adminService;
         private readonly EmailService _emailService;
         private readonly AuthService _authService;
+        private readonly RsaKeyService _rsaKeyService;
         private readonly backend.Data.AppDbContext _context;
 
         public LicenseController(
@@ -19,12 +20,14 @@ namespace backend.Controllers
             AdminService adminService,
             EmailService emailService,
             AuthService authService,
+            RsaKeyService rsaKeyService,
             backend.Data.AppDbContext context)
         {
             _licenseService = licenseService;
             _adminService = adminService;
             _emailService = emailService;
             _authService = authService;
+            _rsaKeyService = rsaKeyService;
             _context = context;
         }
 
@@ -84,7 +87,8 @@ namespace backend.Controllers
             await _context.SaveChangesAsync();
 
             // 生成新的明文激活码 (默认 MaxDevices 继承旧版逻辑，这里简化为 1)
-            var plainKey = await _adminService.GenerateLicenseAsync(user.Id, 1, "SystemReset");
+            var plainKeys = await _adminService.GenerateLicensesAsync(user.Id, 1, 1, "Permanent", null, "SystemReset");
+            var plainKey = plainKeys[0];
 
             // 将新激活码发到用户邮箱
             var htmlBody = $"<h3>重置成功</h3><p>您旧的激活码已全部作废。以下是您的全新激活码，请妥善保管：</p><h2 style='color:blue;'>{plainKey}</h2>";
@@ -99,6 +103,7 @@ namespace backend.Controllers
         /// 且必须强制要求客户端通过 HTTPS 连接。
         /// </summary>
         [HttpPost("activate")]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ActivationPolicy")]
         public async Task<IActionResult> Activate([FromBody] ActivationRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Email) || 
@@ -110,13 +115,22 @@ namespace backend.Controllers
 
             // 实际商用时，这里还应该通过 request.Email 去验证用户身份及归属权
             // 本处简化为直接通过 LicenseKey 进行验证激活
-            var success = await _licenseService.ActivateDeviceAsync(request.LicenseKey, request.HardwareId);
+            var result = await _licenseService.ActivateDeviceAsync(request.LicenseKey, request.HardwareId);
 
-            if (success)
+            if (result.IsSuccess && result.LicenseInfo != null)
             {
-                // 成功激活
-                // 安全说明：对于 C/S 客户端，可以返回一个经过私钥签名 (RSA/ECDSA) 的授权 Token 给客户端本地验证，以防中间人攻击伪造返回值。
-                return Ok(new { Message = "激活成功。" });
+                // 激活成功，生成离线 RSA 证书
+                var payload = new
+                {
+                    HardwareId = request.HardwareId,
+                    LicenseType = result.LicenseInfo.LicenseType,
+                    ExpiresAt = result.LicenseInfo.ExpirationDate,
+                    ActivatedAt = System.DateTime.UtcNow,
+                    MaxDevices = result.LicenseInfo.MaxDevices
+                };
+
+                var signedToken = _rsaKeyService.SignData(payload);
+                return Ok(new { Message = "激活成功。", Signature = signedToken });
             }
             else
             {
@@ -124,6 +138,16 @@ namespace backend.Controllers
                 // 绝对安全策略：模糊化错误信息，不让黑客知道是“激活码错误”还是“设备数量达标”。
                 return Unauthorized(new { Message = "授权失败，请检查凭据或稍后重试。" });
             }
+        }
+
+        /// <summary>
+        /// 供客户端下载验证用公钥
+        /// </summary>
+        [HttpGet("public-key")]
+        public IActionResult GetPublicKey()
+        {
+            var pubKey = _rsaKeyService.GetPublicKeyPem();
+            return Content(pubKey, "text/plain");
         }
     }
 

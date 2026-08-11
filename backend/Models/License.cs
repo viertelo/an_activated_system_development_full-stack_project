@@ -25,5 +25,15 @@ namespace backend.Models
         /// 状态：是否激活、是否被吊销等
         /// </summary>
         public bool IsActive { get; set; } = true;
+
+        /// <summary>
+        /// 授权类型 (Permanent, Subscription, Trial)
+        /// </summary>
+        public string LicenseType { get; set; } = "Permanent";
+
+        /// <summary>
+        /// 过期时间 (若为永久则可为 null)
+        /// </summary>
+        public DateTime? ExpirationDate { get; set; }
     }
 }

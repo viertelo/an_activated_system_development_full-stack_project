@@ -18,23 +18,32 @@ namespace backend.Services
         }
 
         /// <summary>
-        /// 生成一个新的 License
+        /// 生成一个新的或多个 License
         /// 仅返回明文一次，数据库内部只保存 Hash 值
         /// </summary>
-        public async Task<string> GenerateLicenseAsync(Guid userId, int maxDevices, string operatorName)
+        public async Task<List<string>> GenerateLicensesAsync(Guid userId, int maxDevices, int count, string licenseType, DateTime? expirationDate, string operatorName)
         {
-            var plainKey = Guid.NewGuid().ToString().ToUpper();
-            var hashedKey = HashKey(plainKey);
+            var plainKeys = new List<string>();
+            var newLicenses = new List<License>();
 
-            var license = new License
+            for (int i = 0; i < count; i++)
             {
-                LicenseKeyHash = hashedKey,
-                MaxDevices = maxDevices,
-                UserId = userId,
-                IsActive = true
-            };
+                var plainKey = Guid.NewGuid().ToString().ToUpper();
+                var hashedKey = HashKey(plainKey);
 
-            _context.Licenses.Add(license);
+                newLicenses.Add(new License
+                {
+                    LicenseKeyHash = hashedKey,
+                    MaxDevices = maxDevices,
+                    UserId = userId,
+                    IsActive = true,
+                    LicenseType = licenseType,
+                    ExpirationDate = expirationDate
+                });
+                plainKeys.Add(plainKey);
+            }
+
+            _context.Licenses.AddRange(newLicenses);
             
             // 记录安全审计日志
             _context.AuditLogs.Add(new AuditLog
@@ -43,11 +52,11 @@ namespace backend.Services
                 Operator = operatorName,
                 Target = $"UserId:{userId}",
                 IsSuccess = true,
-                Details = $"Generated License with MaxDevices: {maxDevices}"
+                Details = $"Generated {count} Licenses of type {licenseType}. MaxDevices: {maxDevices}"
             });
 
             await _context.SaveChangesAsync();
-            return plainKey;
+            return plainKeys;
         }
 
         /// <summary>

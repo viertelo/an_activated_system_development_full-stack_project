@@ -198,8 +198,8 @@ PlanId
 CustomerId
 Status
 CreatedAt
-ActivatedAt
-ExpiresAt
+ExpiresAt (过期时间)
+LicenseType (授权类型：如 Permanent, Subscription, Trial)
 MaxDevices
 ```
 
@@ -208,12 +208,9 @@ Device：
 ``` text
 DeviceId
 LicenseId
-Platform
-DeviceName
-Fingerprint
-FirstActivatedAt
+HardwareId
+ActivatedAt
 LastSeenAt
-Status
 ```
 
 License 状态：

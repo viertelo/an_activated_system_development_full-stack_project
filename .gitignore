@@ -1,0 +1,44 @@
+# =======================
+# 后端 (C# / .NET)
+# =======================
+backend/bin/
+backend/obj/
+backend/*.user
+backend/*.userosscache
+backend/*.sln.docstates
+
+# =======================
+# 前端 (Next.js / Node)
+# =======================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnp.*
+
+# =======================
+# 环境变量与机密
+# =======================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.cer
+
+# =======================
+# 操作系统与编辑器
+# =======================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

@@ -9,10 +9,17 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-YourSuperSecretPassword}
       POSTGRES_DB: ${DB_NAME:-activation_db}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./data/db:/var/lib/postgresql/data
     networks:
       - activation_net
-    restart: unless-stopped
+    restart: on-failure:5
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
     # 同样不暴露 5432 端口到宿主机，保障数据库绝对安全
 
   backend:
@@ -38,11 +45,22 @@ services:
       # FIDO2 (Passkeys) 配置 (生产环境必须与实际域名匹配，否则无法完成 WebAuthn)
       fido2__serverDomain: ${FIDO2_SERVER_DOMAIN:-localhost}
       fido2__origin: ${FIDO2_ORIGIN:-https://localhost}
+    volumes:
+      - ./data/keys:/app/Keys
     depends_on:
       - db
     networks:
       - activation_net
-    restart: unless-stopped
+    restart: on-failure:5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     # 不暴露 5000 端口，黑客无法直接扫到该端口，全靠 Nginx 内部网络代理
 
   frontend:
@@ -51,9 +69,9 @@ services:
       dockerfile: Dockerfile
     container_name: activation_frontend
     ports:
-      # 可在 .env 中自定义暴露的端口，默认 80 和 443
-      - "${FRONTEND_HTTP_PORT:-80}:80"
-      - "${FRONTEND_HTTPS_PORT:-443}:443" 
+      # 可在 .env 中自定义暴露的端口，前端镜像使用 8080 和 8443 (无特权端口)
+      - "${FRONTEND_HTTP_PORT:-80}:8080"
+      - "${FRONTEND_HTTPS_PORT:-443}:8443" 
     volumes:
       # 在此处挂载宿主机上的 SSL 证书到容器内
       # 请确保宿主机的 ./ssl 目录下存在 cert.pem 和 key.pem
@@ -62,12 +80,17 @@ services:
       - backend
     networks:
       - activation_net
-    restart: unless-stopped
+    restart: on-failure:5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
 
 networks:
   activation_net:
     driver: bridge
-
-volumes:
-  # 用于永久保存 PostgreSQL 的数据，防止容器重启导致激活码丢失
-  pgdata:

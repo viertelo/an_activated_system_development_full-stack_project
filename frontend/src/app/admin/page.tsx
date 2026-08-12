@@ -78,7 +78,7 @@ export default function AdminDashboard() {
     router.push('/');
   };
 
-  const [userId, setUserId] = useState('');
+  // License Generation states
   const [maxDevices, setMaxDevices] = useState(1);
   const [count, setCount] = useState(1);
   const [qrCodeUri, setQrCodeUri] = useState('');
@@ -248,10 +248,7 @@ export default function AdminDashboard() {
     setError('');
     setResult(null);
 
-    if (!userId) {
-      setError('请输入 UserId。');
-      return;
-    }
+
 
     setLoading(true);
     try {
@@ -261,7 +258,6 @@ export default function AdminDashboard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          userId, 
           maxDevices, 
           count, 
           licenseType, 
@@ -381,7 +377,7 @@ export default function AdminDashboard() {
   };
 
   const initiateGenerateForUser = (id: string) => {
-    setUserId(id);
+    // Removed setUserId(id) for auto-fill because UserId is no longer needed
     setActiveTab('dashboard');
   };
 
@@ -573,17 +569,7 @@ export default function AdminDashboard() {
 
               <form onSubmit={handleGenerate} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">目标用户 (UserId GUID)</label>
-                    <input
-                      type="text"
-                      required
-                      value={userId}
-                      onChange={(e) => setUserId(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 dark:bg-gray-700 dark:text-white"
-                      placeholder="例如: 123e4567-e89b-12d3-a456-426614174000"
-                    />
-                  </div>
+                  {/* Removed UserId input field since backend uses Admin Session UserId */}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">授权类型 (License Type)</label>
@@ -879,7 +865,6 @@ export default function AdminDashboard() {
                     <br/>
                     <div className="text-gray-400 mb-1">// Request Body:</div>
                     <div>{'{'}</div>
-                    <div className="pl-4">"email": "user@example.com",</div>
                     <div className="pl-4">"licenseKey": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",</div>
                     <div className="pl-4">"hardwareId": "YOUR_DEVICE_FINGERPRINT"</div>
                     <div>{'}'}</div>
@@ -957,9 +942,9 @@ export default function AdminDashboard() {
                   <div className="text-sm text-gray-600 dark:text-gray-400 space-y-3 pl-8 border-l-2 border-gray-100 dark:border-gray-700 ml-2">
                     <p>如果您需要为某个企业客户或代理商批量生成激活码，请遵循以下流程：</p>
                     <ol className="list-decimal pl-5 space-y-2 text-gray-700 dark:text-gray-300 font-medium">
-                      <li>在左侧导航栏进入 <strong>【注册人员管理】</strong>，找到您的目标客户账号（必须让客户先在系统内注册账号）。</li>
-                      <li>点击该客户操作栏中的 <span className="text-blue-600 dark:text-blue-400">“生成发卡”</span> 按钮，系统会自动跳回【大盘与发卡】页面，并帮您填好该客户的唯一标识符 (UserId)。</li>
+                      <li>在左侧导航栏进入 <strong>【大盘与发卡】</strong> 页面。</li>
                       <li>向下滚动找到 <strong>【批量生成激活码】</strong> 面板。</li>
+                      <li>系统会自动将生成的激活码与您当前的管理账号绑定（无需手动填写目标用户 UserId）。</li>
                       <li>根据该客户采购的权益，选择 <strong>授权类型</strong>（永久版/订阅版/试用版）。如果不是永久版，请务必设定准确的 <strong>过期时间</strong>。</li>
                       <li>填写 <strong>发卡数量</strong>（例如 100 张）以及每张卡允许激活的 <strong>最大设备数</strong>（默认为 1）。</li>
                       <li>点击【生成激活码】按钮。生成成功后，点击下方出现的 <strong>【导出为 CSV】</strong>，即可将 100 个激活码直接打包发给客户！</li>

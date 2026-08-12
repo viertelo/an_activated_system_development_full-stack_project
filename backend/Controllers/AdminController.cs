@@ -59,7 +59,10 @@ namespace backend.Controllers
             int count = request.Count > 0 ? request.Count : 1;
             string licenseType = string.IsNullOrEmpty(request.LicenseType) ? "Permanent" : request.LicenseType;
             
-            var newKeys = await _adminService.GenerateLicensesAsync(request.UserId, request.MaxDevices, count, licenseType, request.ExpirationDate, operatorName, request.AllowDeviceTransfer, request.MaxActivations);
+            var adminUserIdString = HttpContext.Request.Headers["X-User-Id"].FirstOrDefault();
+            var adminUserId = string.IsNullOrEmpty(adminUserIdString) ? Guid.Empty : Guid.Parse(adminUserIdString);
+
+            var newKeys = await _adminService.GenerateLicensesAsync(adminUserId, request.MaxDevices, count, licenseType, request.ExpirationDate, operatorName, request.AllowDeviceTransfer, request.MaxActivations);
             
             // 仅在此处返回明文激活码供后台显示或邮件发送。之后再也无法从数据库读取明文。
             return Ok(new { LicenseKeys = newKeys, Message = $"成功批量生成 {count} 张激活码并已将哈希安全入库。" });
@@ -218,7 +221,6 @@ namespace backend.Controllers
 
     public class GenerateLicenseRequest
     {
-        public System.Guid UserId { get; set; }
         public int MaxDevices { get; set; } = 1;
         public int Count { get; set; } = 1;
         public string? LicenseType { get; set; }

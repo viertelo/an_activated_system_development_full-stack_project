@@ -35,6 +35,7 @@
 ├── frontend/               # 💻 Next.js 16 静态前端 (图表大盘、发卡面板、Passkey 等)
 ├── docs/                   # 📚 核心文档库 (开发指南、架构解析、API 规范)
 │   ├── architecture_and_workflow.md
+│   ├── disaster_recovery_and_backup.md
 │   └── local_network_deployment_guide.md
 ├── docker-compose.yml      # 🐳 一键生产部署编排文件 (强制 HTTPS 外网访问)
 ├── docker-compose.lan.yml  # 🏠 局域网无外网部署编排 (HTTP 测试环境专用)

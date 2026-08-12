@@ -21,10 +21,10 @@ EXPOSE 5000
 # 覆盖默认端口配置，绑定到所有内部IP
 ENV ASPNETCORE_URLS=http://+:5000
 
-# 创建 Keys 目录并赋予 $APP_UID 权限，防止运行时没有权限写入公私钥
-RUN mkdir -p /app/Keys && chown -R $APP_UID /app/Keys && chmod 700 /app/Keys
+# 创建 Keys 目录
+RUN mkdir -p /app/Keys && chmod 700 /app/Keys
 
-# 运行非 root 用户，增强安全性 (.NET 镜像通常提供缺省的 app 账户)
-USER $APP_UID
+# 运行为 root 用户（注释掉 USER $APP_UID），解决宿主机挂载目录无写入权限的问题
+# USER $APP_UID
 
 ENTRYPOINT ["dotnet", "backend.dll"]

@@ -288,14 +288,31 @@ export default function AdminDashboard() {
   const handleExport = () => {
     if (!result || !result.licenseKeys) return;
     
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + "LicenseKey\n"
-      + result.licenseKeys.join("\n");
+    const headers = [
+      "激活码 (License Key)",
+      "授权类型 (License Type)",
+      "最大并发设备数 (Max Devices)",
+      "允许自动换绑 (Allow Transfer)",
+      "终生总激活次数 (Max Activations)",
+      "过期时间 (Expiration Date)"
+    ].join(",");
+
+    const expDateStr = expirationDate ? new Date(expirationDate).toLocaleString() : "永久有效";
+    const transferStr = allowDeviceTransfer ? "是 (允许换绑)" : "否 (固定单机)";
+    const maxActStr = maxActivations === 0 ? "不限次数" : `${maxActivations}次`;
+
+    const rows = result.licenseKeys.map(key => 
+      `${key},${licenseType},${maxDevices},${transferStr},${maxActStr},${expDateStr}`
+    ).join("\n");
+
+    // 添加 \uFEFF (BOM) 确保 Excel 打开时不会乱码
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + headers + "\n" + rows;
       
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "licenses.csv");
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.setAttribute("download", `licenses_batch_${dateStr}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -25,7 +25,7 @@ namespace backend.Services
         /// <param name="plainLicenseKey">用户输入的原始激活码</param>
         /// <param name="hardwareId">设备的硬件指纹</param>
         /// <returns>是否激活成功</returns>
-        public async Task<(bool IsSuccess, License? LicenseInfo)> ActivateDeviceAsync(string plainLicenseKey, string hardwareId, string email)
+        public async Task<(bool IsSuccess, License? LicenseInfo)> ActivateDeviceAsync(string plainLicenseKey, string hardwareId)
         {
             // 1. 哈希处理（严禁明文比对）
             var hashedKey = HashKey(plainLicenseKey);

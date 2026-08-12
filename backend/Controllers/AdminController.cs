@@ -112,9 +112,9 @@ namespace backend.Controllers
                 ChartData = chartData
             };
 
-            // 设置缓存，过期时间为 5 分钟
+            // 设置缓存，过期时间缩短至 2 秒，实现大盘数据的准实时更新
             var cacheEntryOptions = new MemoryCacheEntryOptions()
-                .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+                .SetAbsoluteExpiration(TimeSpan.FromSeconds(2));
 
             _cache.Set(cacheKey, statsData, cacheEntryOptions);
 

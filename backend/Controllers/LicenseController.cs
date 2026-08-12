@@ -31,71 +31,7 @@ namespace backend.Controllers
             _context = context;
         }
 
-        public class ForgotLicenseDto
-        {
-            public string Email { get; set; } = string.Empty;
-        }
 
-        /// <summary>
-        /// 触发找回激活码（重置换新）流程
-        /// </summary>
-        [HttpPost("forgot")]
-        public async System.Threading.Tasks.Task<IActionResult> ForgotLicense([FromBody] ForgotLicenseDto dto)
-        {
-            var user = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(_context.Users, u => u.Email == dto.Email);
-            if (user == null)
-            {
-                // 安全原则：即使邮箱不存在，也不要明确提示，防止枚举攻击
-                return Ok(new { Message = "如果您的邮箱存在，重置链接已发送到您的邮箱。" });
-            }
-
-            var token = _authService.GenerateEmailVerificationToken();
-            user.EmailVerificationToken = token;
-            user.EmailTokenExpiry = System.DateTime.UtcNow.AddHours(1); // 1小时内有效
-            await _context.SaveChangesAsync();
-
-            var resetLink = $"http://{Request.Host}/api/license/reset?token={token}";
-            var htmlBody = $"<h3>激活码重置请求</h3><p>系统收到您找回激活码的请求。</p><p>为保证绝对安全，系统无法提供原激活码。请点击下方链接，系统将为您<strong>吊销旧激活码并颁发一个全新的激活码</strong>：</p><p><a href='{resetLink}'>点击重置并生成新激活码</a></p><p>如果这不是您的操作，请忽略此邮件。</p>";
-            
-            await _emailService.SendEmailAsync(user.Email, "您的激活码重置确认", htmlBody);
-
-            return Ok(new { Message = "如果您的邮箱存在，重置链接已发送到您的邮箱。" });
-        }
-
-        /// <summary>
-        /// 执行重置（验证 token，吊销旧码，发新码到邮箱）
-        /// </summary>
-        [HttpGet("reset")]
-        public async System.Threading.Tasks.Task<IActionResult> ResetLicense([FromQuery] string token)
-        {
-            var user = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(_context.Users, u => u.EmailVerificationToken == token);
-            if (user == null || user.EmailTokenExpiry < System.DateTime.UtcNow)
-            {
-                return BadRequest("重置链接无效或已过期。");
-            }
-
-            // 吊销该用户所有激活状态的旧激活码
-            var activeLicenses = _context.Licenses.Where(l => l.UserId == user.Id && l.IsActive);
-            foreach(var lic in activeLicenses)
-            {
-                lic.IsActive = false;
-            }
-
-            // 清除 Token
-            user.EmailVerificationToken = null;
-            user.EmailTokenExpiry = null;
-            await _context.SaveChangesAsync();
-
-            // 生成新的明文激活码 (默认 MaxDevices 继承旧版逻辑，这里简化为 1)
-            var plainKeys = await _adminService.GenerateLicensesAsync(user.Id, 1, 1, "Permanent", null, "SystemReset", false, 0);
-            var plainKey = plainKeys[0];
-
-            // 将新激活码发到用户邮箱
-            var htmlBody = $"<h3>重置成功</h3><p>您旧的激活码已全部作废。以下是您的全新激活码，请妥善保管：</p><h2 style='color:blue;'>{plainKey}</h2>";
-            await _emailService.SendEmailAsync(user.Email, "您的全新激活码", htmlBody);
-
-            return Ok("激活码已重置换新！新的明文激活码已发送到您的邮箱，请查收。");
-        }
 
         /// <summary>
         /// 激活端点
@@ -106,15 +42,14 @@ namespace backend.Controllers
         [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ActivationPolicy")]
         public async Task<IActionResult> Activate([FromBody] ActivationRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email) || 
-                string.IsNullOrWhiteSpace(request.LicenseKey) || 
+            if (string.IsNullOrWhiteSpace(request.LicenseKey) || 
                 string.IsNullOrWhiteSpace(request.HardwareId))
             {
                 return BadRequest("参数不完整。");
             }
 
             // 验证用户身份及归属权
-            var result = await _licenseService.ActivateDeviceAsync(request.LicenseKey, request.HardwareId, request.Email);
+            var result = await _licenseService.ActivateDeviceAsync(request.LicenseKey, request.HardwareId);
 
             if (result.IsSuccess && result.LicenseInfo != null)
             {
@@ -152,7 +87,6 @@ namespace backend.Controllers
 
     public class ActivationRequest
     {
-        public string Email { get; set; } = string.Empty;
         public string LicenseKey { get; set; } = string.Empty;
         public string HardwareId { get; set; } = string.Empty;
     }

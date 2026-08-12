@@ -1,6 +1,7 @@
 using backend.Data;
 using backend.Models;
 using backend.Services;
+using backend.Filters;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
@@ -12,6 +13,7 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [SessionAuth]
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -96,22 +98,47 @@ namespace backend.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
-            var hashedPw = HashPassword(dto.Password);
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email && u.PasswordHash == hashedPw);
-
+            // First, find the user by email regardless of password to check lockout
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
             if (user == null)
             {
+                return Unauthorized(new { Message = "邮箱或密码错误。" });
+            }
+
+            if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
+            {
+                var remainingMinutes = (int)(user.LockoutEnd.Value - DateTime.UtcNow).TotalMinutes + 1;
+                return Unauthorized(new { Message = $"密码错误次数过多，账号已锁定，请 {remainingMinutes} 分钟后再试。" });
+            }
+
+            var hashedPw = HashPassword(dto.Password);
+            if (user.PasswordHash != hashedPw)
+            {
+                user.FailedLoginAttempts++;
+                if (user.FailedLoginAttempts >= 3)
+                {
+                    user.LockoutEnd = DateTime.UtcNow.AddMinutes(15);
+                }
+                
                 _context.AuditLogs.Add(new AuditLog
                 {
                     Action = "UserLogin",
                     Operator = dto.Email,
                     Target = "System",
                     IsSuccess = false,
-                    Details = "邮箱或密码错误"
+                    Details = $"密码错误 (连续错误 {user.FailedLoginAttempts} 次)"
                 });
                 await _context.SaveChangesAsync();
+                
+                if (user.FailedLoginAttempts >= 3)
+                    return Unauthorized(new { Message = "密码错误次数过多，账号已锁定 15 分钟。" });
+                
                 return Unauthorized(new { Message = "邮箱或密码错误。" });
             }
+
+            // Authentication succeeded, reset lockout
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
 
             if (!user.IsEmailVerified)
             {
@@ -146,11 +173,15 @@ namespace backend.Controllers
                 }
             }
 
-            // 登录成功，颁发 JWT Token 的逻辑 (此前已在 Program.cs 配置，此处可在此发放真实 Token，暂用简单回执演示)
+            // 登录成功，颁发 SessionToken
+            user.CurrentSessionToken = Guid.NewGuid().ToString();
+            await _context.SaveChangesAsync();
+
             return Ok(new { 
                 Message = "登录成功", 
                 UserId = user.Id, 
-                Role = user.Role 
+                Role = user.Role,
+                SessionToken = user.CurrentSessionToken
             });
         }
 
@@ -173,13 +204,87 @@ namespace backend.Controllers
 
             var (secret, setupUri) = _authService.GenerateTwoFactorSecret(user.Email);
             user.TwoFactorSecret = secret;
-            user.IsTwoFactorEnabled = true;
+            // 不立即启用，需等待验证
+            // user.IsTwoFactorEnabled = true; 
             await _context.SaveChangesAsync();
 
             return Ok(new { 
-                Message = "2FA 密钥已生成。请将其导入至 Google Authenticator。",
+                Message = "2FA 密钥已生成。请将其导入至 Google Authenticator 等应用中。",
                 Secret = secret,
                 QrCodeUri = setupUri 
+            });
+        }
+
+        public class Verify2FaDto
+        {
+            public Guid UserId { get; set; }
+            public string Code { get; set; } = string.Empty;
+        }
+
+        [HttpPost("2fa/verify")]
+        public async Task<IActionResult> Verify2FA([FromBody] Verify2FaDto dto)
+        {
+            var user = await _context.Users.FindAsync(dto.UserId);
+            if (user == null) return NotFound();
+
+            if (string.IsNullOrEmpty(user.TwoFactorSecret))
+            {
+                return BadRequest(new { Message = "尚未生成 2FA 密钥，请先重新配置。" });
+            }
+
+            if (!_authService.ValidateTwoFactorCode(user.TwoFactorSecret, dto.Code))
+            {
+                return BadRequest(new { Message = "2FA 验证码无效，请重试。" });
+            }
+
+            user.IsTwoFactorEnabled = true;
+            await _context.SaveChangesAsync();
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Enable2FA",
+                Operator = user.Email,
+                Target = $"UserId:{user.Id}",
+                IsSuccess = true,
+                Details = "成功开启二次验证 (2FA)"
+            });
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "2FA 配置成功，已为您开启二次验证保护。" });
+        }
+
+        [HttpPost("2fa/disable")]
+        public async Task<IActionResult> Disable2FA([FromBody] Enable2FaDto dto)
+        {
+            var user = await _context.Users.FindAsync(dto.UserId);
+            if (user == null) return NotFound();
+
+            user.IsTwoFactorEnabled = false;
+            user.TwoFactorSecret = null;
+            await _context.SaveChangesAsync();
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Disable2FA",
+                Operator = user.Email,
+                Target = $"UserId:{user.Id}",
+                IsSuccess = true,
+                Details = "关闭了二次验证 (2FA)"
+            });
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "已成功关闭 2FA 二次验证。" });
+        }
+
+        [HttpGet("2fa/status/{userId}")]
+        public async Task<IActionResult> Get2FAStatus(Guid userId)
+        {
+            var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null) return NotFound();
+
+            return Ok(new
+            {
+                IsTwoFactorEnabled = user.IsTwoFactorEnabled
             });
         }
 
@@ -264,6 +369,87 @@ namespace backend.Controllers
             return Ok(new { Message = "密码已成功重置，您现在可以使用新密码登录。" });
         }
 
+        public class Forgot2FADto
+        {
+            public string Email { get; set; } = string.Empty;
+        }
+
+        public class Reset2FADto
+        {
+            public string Token { get; set; } = string.Empty;
+        }
+
+        [HttpPost("2fa/forgot")]
+        public async Task<IActionResult> Forgot2FA([FromBody] Forgot2FADto dto)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            if (user == null || !user.IsTwoFactorEnabled)
+            {
+                // 安全原则：即便不符合条件，也返回成功信息防止探测
+                return Ok(new { Message = "如果您的邮箱已注册且已开启二次验证，重置链接已发送到该邮箱。" });
+            }
+
+            var token = _authService.GenerateEmailVerificationToken();
+            user.TwoFactorResetToken = token;
+            user.TwoFactorResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+            
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Forgot2FA",
+                Operator = dto.Email,
+                Target = $"UserId:{user.Id}",
+                IsSuccess = true,
+                Details = "请求重置二次验证"
+            });
+
+            await _context.SaveChangesAsync();
+
+            var resetLink = $"http://{Request.Host}/reset-2fa?token={token}";
+            var htmlBody = $"<h3>关闭二次验证申请</h3><p>系统收到了您关闭二次验证(2FA)的请求。</p><p>请点击下方链接强制关闭您的 2FA（链接在1小时内有效）：</p><p><a href='{resetLink}'>点击关闭二次验证</a></p><p>如果这不是您的操作，请忽略此邮件，您的账户是安全的。</p>";
+            
+            await _emailService.SendEmailAsync(user.Email, "您的 2FA 重置链接", htmlBody);
+
+            return Ok(new { Message = "如果您的邮箱已注册且已开启二次验证，重置链接已发送到该邮箱。" });
+        }
+
+        [HttpPost("2fa/reset")]
+        public async Task<IActionResult> Reset2FA([FromBody] Reset2FADto dto)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.TwoFactorResetToken == dto.Token);
+            
+            if (user == null || user.TwoFactorResetTokenExpiry < DateTime.UtcNow)
+            {
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    Action = "Reset2FA",
+                    Operator = "Unknown",
+                    Target = "Token Validation",
+                    IsSuccess = false,
+                    Details = "无效或过期的 2FA 重置链接"
+                });
+                await _context.SaveChangesAsync();
+                return BadRequest(new { Message = "重置链接无效或已过期。" });
+            }
+
+            user.IsTwoFactorEnabled = false;
+            user.TwoFactorSecret = null;
+            user.TwoFactorResetToken = null;
+            user.TwoFactorResetTokenExpiry = null;
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Reset2FA",
+                Operator = user.Email,
+                Target = $"UserId:{user.Id}",
+                IsSuccess = true,
+                Details = "成功通过邮箱关闭二次验证"
+            });
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "二次验证已成功关闭，您现在可以使用账号密码直接登录。" });
+        }
+
         // 简易哈希函数 (与前端传来的明文做 Hash 匹配)
         private string HashPassword(string password)
         {
@@ -273,66 +459,6 @@ namespace backend.Controllers
             return Convert.ToBase64String(hash);
         }
 
-        public class SecondaryPasswordDto
-        {
-            public Guid UserId { get; set; }
-            public string SecondaryPassword { get; set; } = string.Empty;
-        }
 
-        [HttpPost("secondary-password/setup")]
-        public async Task<IActionResult> SetupSecondaryPassword([FromBody] SecondaryPasswordDto dto)
-        {
-            var user = await _context.Users.FindAsync(dto.UserId);
-            if (user == null) return NotFound();
-
-            if (!user.IsEmailVerified)
-            {
-                return BadRequest(new { Message = "必须先完成邮件验证，才能配置二次安全密码。" });
-            }
-
-            user.SecondaryPasswordHash = HashPassword(dto.SecondaryPassword);
-            await _context.SaveChangesAsync();
-
-            _context.AuditLogs.Add(new AuditLog
-            {
-                Action = "SetupSecondaryPassword",
-                Operator = user.Email,
-                Target = $"UserId:{user.Id}",
-                IsSuccess = true,
-                Details = "成功设置了二次安全密码"
-            });
-            await _context.SaveChangesAsync();
-
-            return Ok(new { Message = "二次安全密码配置成功。" });
-        }
-
-        [HttpPost("secondary-password/verify")]
-        public async Task<IActionResult> VerifySecondaryPassword([FromBody] SecondaryPasswordDto dto)
-        {
-            var user = await _context.Users.FindAsync(dto.UserId);
-            if (user == null) return NotFound();
-
-            if (string.IsNullOrEmpty(user.SecondaryPasswordHash))
-            {
-                return BadRequest(new { Message = "您尚未配置二次安全密码。" });
-            }
-
-            var hashedPw = HashPassword(dto.SecondaryPassword);
-            if (user.SecondaryPasswordHash != hashedPw)
-            {
-                _context.AuditLogs.Add(new AuditLog
-                {
-                    Action = "VerifySecondaryPassword",
-                    Operator = user.Email,
-                    Target = $"UserId:{user.Id}",
-                    IsSuccess = false,
-                    Details = "二次安全密码验证失败"
-                });
-                await _context.SaveChangesAsync();
-                return Unauthorized(new { Message = "二次安全密码不正确。" });
-            }
-
-            return Ok(new { Message = "验证成功" });
-        }
     }
 }

@@ -11,6 +11,18 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 
+// 添加 Session 以支持 FIDO2 Challenge 暂存
+builder.Services.AddMemoryCache();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(5);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.None; // 对于跨域前后端分离必备
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // 跨域时配合 None 必须设为 Secure
+});
+
 // 配置 WebAuthn (Fido2) 服务
 builder.Services.AddFido2(options =>
 {
@@ -137,6 +149,8 @@ app.UseHttpsRedirection();
 // 启用跨域和限流中间件
 app.UseCors("AllowFrontend");
 app.UseRateLimiter();
+
+app.UseSession(); // 启用 Session 必须在 UseCors 之后，UseAuthorization 之前
 
 app.UseAuthorization();
 

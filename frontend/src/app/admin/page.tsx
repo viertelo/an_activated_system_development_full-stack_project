@@ -4,8 +4,13 @@ import { useState, useEffect } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { QRCodeSVG } from 'qrcode.react';
+import useSWR from 'swr';
+
+import { startRegistration } from '@simplewebauthn/browser';
 
 interface GenerateResult {
   message?: string;
@@ -39,6 +44,27 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState<{ userId: string, role: string } | null>(null);
 
+  const apiFetch = async (url: string, options: RequestInit = {}) => {
+    const sessionToken = localStorage.getItem('sessionToken');
+    const userStr = localStorage.getItem('user');
+    const headers = new Headers(options.headers || {});
+    if (sessionToken) headers.append('X-Session-Token', sessionToken);
+    if (userStr) {
+      try {
+        const parsed = JSON.parse(userStr);
+        if (parsed.userId) headers.append('X-User-Id', parsed.userId);
+      } catch (e) {}
+    }
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      toast.error('登录已过期或在其他设备登录');
+      localStorage.removeItem('user');
+      localStorage.removeItem('sessionToken');
+      router.push('/');
+    }
+    return res;
+  };
+
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
@@ -55,61 +81,165 @@ export default function AdminDashboard() {
   const [userId, setUserId] = useState('');
   const [maxDevices, setMaxDevices] = useState(1);
   const [count, setCount] = useState(1);
+  const [qrCodeUri, setQrCodeUri] = useState('');
+  const [twoFactorSecret, setTwoFactorSecret] = useState('');
+  const [twoFactorVerifyCode, setTwoFactorVerifyCode] = useState('');
   const [licenseType, setLicenseType] = useState('Permanent');
   const [expirationDate, setExpirationDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [error, setError] = useState('');
 
-  // 统计大盘数据
-  const [stats, setStats] = useState<StatsData | null>(null);
-  const [statsLoading, setStatsLoading] = useState(true);
-
-  // 用户数据
-  const [users, setUsers] = useState<UserData[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-
-  const fetchStats = async () => {
-    try {
-      setStatsLoading(true);
-      const res = await fetch('/api/admin/stats');
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch stats", err);
-    } finally {
-      setStatsLoading(false);
-    }
+  const fetcher = async (url: string) => {
+    const res = await apiFetch(url);
+    if (!res.ok) throw new Error('An error occurred while fetching the data.');
+    return res.json();
   };
 
-  const fetchUsers = async () => {
+  const { data: stats, error: statsError, isLoading: statsLoading } = useSWR<StatsData>(
+    '/api/admin/stats',
+    fetcher,
+    { refreshInterval: 60000 } // Optionally auto-refresh every minute
+  );
+
+  const { data: users, error: usersError, isLoading: usersLoading, mutate: mutateUsers } = useSWR<UserData[]>(
+    activeTab === 'users' ? '/api/admin/users' : null,
+    fetcher
+  );
+
+  // Settings / Security state
+  const [is2faEnabled, setIs2faEnabled] = useState(false);
+  const [passkeys, setPasskeys] = useState<any[]>([]);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+
+  const fetchSettingsStatus = async () => {
+    if (!currentUser?.userId) return;
     try {
-      setUsersLoading(true);
-      const res = await fetch('/api/admin/users');
+      setSettingsLoading(true);
+      const res = await apiFetch(`/api/auth/2fa/status/${currentUser.userId}`);
       if (res.ok) {
         const data = await res.json();
-        setUsers(data);
+        setIs2faEnabled(data.isTwoFactorEnabled);
       }
     } catch (err) {
-      console.error("Failed to fetch users", err);
+      console.error("Failed to fetch settings status", err);
     } finally {
-      setUsersLoading(false);
+      setSettingsLoading(false);
     }
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchStats();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'users') {
+    if (activeTab === 'settings' && currentUser) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      fetchUsers();
+      fetchSettingsStatus();
     }
-  }, [activeTab]);
+  }, [activeTab, currentUser]);
+
+  const handleSetup2FA = async () => {
+    if (!currentUser?.userId) return;
+    try {
+      setSettingsLoading(true);
+      const res = await apiFetch(`/api/auth/2fa/setup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.userId })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setQrCodeUri(data.qrCodeUri);
+        setTwoFactorSecret(data.secret);
+        toast.success(data.message || '二维码已生成');
+      } else {
+        toast.error(data.message || '生成失败');
+      }
+    } catch (err) {
+      toast.error('系统错误');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleVerify2FA = async () => {
+    if (!currentUser?.userId) return;
+    try {
+      setSettingsLoading(true);
+      const res = await apiFetch(`/api/auth/2fa/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.userId, code: twoFactorVerifyCode })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || '2FA 配置成功');
+        setIs2faEnabled(true);
+        setQrCodeUri('');
+        setTwoFactorSecret('');
+        setTwoFactorVerifyCode('');
+      } else {
+        toast.error(data.message || '验证失败');
+      }
+    } catch (err) {
+      toast.error('系统错误');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    if (!currentUser?.userId || !confirm('确定要关闭 2FA 二次验证吗？这会降低账户安全性。')) return;
+    try {
+      setSettingsLoading(true);
+      const res = await apiFetch(`/api/auth/2fa/disable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.userId })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || '已关闭 2FA');
+        setIs2faEnabled(false);
+      } else {
+        toast.error(data.message || '关闭失败');
+      }
+    } catch (err) {
+      toast.error('系统错误');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleRegisterPasskey = async () => {
+    if (!currentUser?.userId) return;
+    try {
+      setSettingsLoading(true);
+      // 1. Get options from server
+      const email = currentUser.userId; // in this app userId in localstorage is actually the email
+      const resp = await apiFetch(`/api/passkey/makeCredentialOptions?email=${encodeURIComponent(email)}`, { method: 'POST' });
+      if (!resp.ok) throw new Error('Failed to get registration options');
+      const options = await resp.json();
+
+      // 2. Pass options to browser authenticator
+      const attResp = await startRegistration(options);
+
+      // 3. Send response back to server
+      const verifyResp = await apiFetch(`/api/passkey/makeCredential?email=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(attResp),
+      });
+
+      if (verifyResp.ok) {
+        toast.success('通行密钥添加成功');
+      } else {
+        const error = await verifyResp.json();
+        toast.error(error.ErrorMessage || '通行密钥添加失败');
+      }
+    } catch (err: any) {
+      toast.error(err.message || '通行密钥注册被取消或系统错误');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,7 +253,7 @@ export default function AdminDashboard() {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/generate-license', {
+      const res = await apiFetch('/api/admin/generate-license', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,13 +302,13 @@ export default function AdminDashboard() {
     if (!confirm(`确定要将此用户的角色修改为 ${newRole} 吗？`)) return;
     
     try {
-      const res = await fetch(`/api/admin/users/${id}/role`, {
+      const res = await apiFetch(`/api/admin/users/${id}/role`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole })
       });
       if (res.ok) {
-        fetchUsers();
+        mutateUsers();
       } else {
         toast.error('更新角色失败');
       }
@@ -190,13 +320,39 @@ export default function AdminDashboard() {
   const handleDeleteUser = async (id: string) => {
     if (!confirm('确定要删除此用户吗？此操作不可逆！')) return;
     try {
-      const res = await fetch(`/api/admin/users/${id}`, {
+      const res = await apiFetch(`/api/admin/users/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {
-        fetchUsers();
+        mutateUsers();
       } else {
         toast.error('删除失败');
+      }
+    } catch {
+      toast.error('系统错误');
+    }
+  };
+
+  const handleResetUserPassword = async (id: string) => {
+    const newPassword = prompt('请输入该用户的新密码 (最少6位):');
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+      toast.error('密码长度至少需要 6 个字符');
+      return;
+    }
+    if (!confirm(`确定要为该用户重置密码吗？`)) return;
+
+    try {
+      const res = await apiFetch(`/api/admin/users/${id}/password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword })
+      });
+      if (res.ok) {
+        toast.success('密码重置成功');
+      } else {
+        const errData = await res.json();
+        toast.error(errData.Message || '重置失败');
       }
     } catch {
       toast.error('系统错误');
@@ -232,9 +388,24 @@ export default function AdminDashboard() {
           >
             安全与账户设置
           </button>
+          <button 
+            onClick={() => setActiveTab('api-docs')}
+            className={`w-full text-left px-4 py-2 rounded-lg transition-colors font-medium ${activeTab === 'api-docs' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'}`}
+          >
+            API 使用说明
+          </button>
+          <button 
+            onClick={() => setActiveTab('help')}
+            className={`w-full text-left px-4 py-2 rounded-lg transition-colors font-medium ${activeTab === 'help' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'}`}
+          >
+            系统帮助文档
+          </button>
         </nav>
         
         <div className="absolute bottom-8 w-56 space-y-4">
+          <div className="px-4 pb-2">
+            <ThemeSwitcher />
+          </div>
           {currentUser && (
             <div className="px-4 text-sm text-gray-500 dark:text-gray-400">
               <div className="truncate">当前用户: {currentUser.userId}</div>
@@ -273,6 +444,18 @@ export default function AdminDashboard() {
             className={`flex-1 px-4 py-2 text-sm font-medium rounded ${activeTab === 'settings' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 dark:text-gray-300'}`}
           >
             安全设置
+          </button>
+          <button 
+            onClick={() => setActiveTab('api-docs')}
+            className={`flex-1 px-4 py-2 text-sm font-medium rounded ${activeTab === 'api-docs' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 dark:text-gray-300'}`}
+          >
+            API 接口
+          </button>
+          <button 
+            onClick={() => setActiveTab('help')}
+            className={`flex-1 px-4 py-2 text-sm font-medium rounded ${activeTab === 'help' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 dark:text-gray-300'}`}
+          >
+            系统帮助
           </button>
           <button 
             onClick={handleLogout}
@@ -484,7 +667,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                      {users.map(user => (
+                      {(users || []).map(user => (
                         <tr key={user.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">{user.email}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -514,6 +697,12 @@ export default function AdminDashboard() {
                               设为{user.role === 'Admin' ? 'User' : 'Admin'}
                             </button>
                             <button
+                              onClick={() => handleResetUserPassword(user.id)}
+                              className="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300"
+                            >
+                              重置密码
+                            </button>
+                            <button
                               onClick={() => handleDeleteUser(user.id)}
                               className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                             >
@@ -522,7 +711,7 @@ export default function AdminDashboard() {
                           </td>
                         </tr>
                       ))}
-                      {users.length === 0 && (
+                      {(!users || users.length === 0) && (
                         <tr>
                           <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-500">
                             暂无用户数据
@@ -533,6 +722,199 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="w-full max-w-5xl mx-auto space-y-8">
+            <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10">
+              <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">安全与账户设置</h2>
+              
+              <div className="space-y-10">
+                {/* 2FA Section */}
+                <div>
+                  <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2 mb-4">二次验证 (2FA)</h3>
+                  <div className="bg-gray-50 dark:bg-gray-700/50 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                      状态: {is2faEnabled ? <span className="text-green-600 font-bold ml-2">已开启</span> : <span className="text-gray-500 font-bold ml-2">未开启</span>}
+                    </p>
+                    
+                    {!is2faEnabled && !qrCodeUri && (
+                      <button 
+                        onClick={handleSetup2FA} 
+                        disabled={settingsLoading}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded shadow disabled:opacity-50 transition-colors"
+                      >
+                        配置 2FA
+                      </button>
+                    )}
+
+                    {qrCodeUri && !is2faEnabled && (
+                      <div className="mt-4 p-6 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                          1. 请使用 <span className="font-semibold text-gray-900 dark:text-white">Google Authenticator</span> 或其他身份验证器扫描下方二维码。<br/>
+                          2. 如果无法扫码，请手动输入密钥：<span className="font-mono bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700">{twoFactorSecret}</span>
+                        </p>
+                        <div className="mb-6 bg-white p-4 inline-block rounded-lg shadow-sm border border-gray-100">
+                          <QRCodeSVG value={qrCodeUri} size={180} level="M" includeMargin={true} />
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">3. 在下方输入应用显示的 6 位验证码以确认绑定：</p>
+                        <div className="flex gap-3 max-w-sm">
+                          <input 
+                            type="text" 
+                            maxLength={6}
+                            placeholder="输入 6 位验证码" 
+                            value={twoFactorVerifyCode}
+                            onChange={e => setTwoFactorVerifyCode(e.target.value)}
+                            className="flex-1 rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                          />
+                          <button 
+                            onClick={handleVerify2FA}
+                            disabled={settingsLoading || twoFactorVerifyCode.length !== 6}
+                            className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-md shadow disabled:opacity-50 transition-colors"
+                          >
+                            验证并开启
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {is2faEnabled && (
+                      <button 
+                        onClick={handleDisable2FA}
+                        disabled={settingsLoading}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded shadow disabled:opacity-50 transition-colors"
+                      >
+                        关闭 2FA
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Passkeys Section */}
+                <div>
+                  <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2 mb-4">通行密钥 (Passkeys)</h3>
+                  <div className="bg-gray-50 dark:bg-gray-700/50 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                      使用指纹、面容或设备 PIN 码等免密安全方式快速登录。
+                    </p>
+                    <div className="flex flex-col max-w-sm space-y-3">
+                      <button 
+                        onClick={handleRegisterPasskey}
+                        disabled={settingsLoading}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded shadow disabled:opacity-50 transition-colors"
+                      >
+                        注册新的通行密钥
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'api-docs' && (
+          <div className="w-full max-w-5xl mx-auto space-y-8">
+            <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10">
+              <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">API 接入与使用说明</h2>
+              
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">1. 激活码激活接口 (客户端调用)</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    供您的客户端软件用来激活设备。调用成功后，会返回包含 RSA 签名的离线授权凭证。
+                  </p>
+                  
+                  <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm text-green-400 overflow-x-auto">
+                    <div className="text-gray-400 mb-2">// POST /api/License/activate</div>
+                    <div>POST {typeof window !== 'undefined' ? window.location.origin : 'http://<your-domain>'}/api/License/activate</div>
+                    <div>Content-Type: application/json</div>
+                    <br/>
+                    <div className="text-gray-400 mb-1">// Request Body:</div>
+                    <div>{'{'}</div>
+                    <div className="pl-4">"email": "user@example.com",</div>
+                    <div className="pl-4">"licenseKey": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",</div>
+                    <div className="pl-4">"hardwareId": "YOUR_DEVICE_FINGERPRINT"</div>
+                    <div>{'}'}</div>
+                  </div>
+                  
+                  <div className="mt-4 bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-sm text-gray-700 dark:text-gray-300">
+                    <strong>返回参数说明:</strong>
+                    <ul className="list-disc pl-5 mt-2 space-y-1">
+                      <li><code>Message</code>: 激活结果的提示信息</li>
+                      <li><code>Signature</code>: 经过 RSA 签名的 JWT / Base64，客户端应使用公钥验证其合法性并存储在本地。</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">2. 获取公钥接口</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    客户端可以通过此接口下载最新的 RSA 验证公钥（建议在编译软件时直接内置，以防止网络中间人劫持）。
+                  </p>
+                  <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm text-green-400 overflow-x-auto">
+                    <div className="text-gray-400 mb-2">// GET /api/License/public-key</div>
+                    <div>GET {typeof window !== 'undefined' ? window.location.origin : 'http://<your-domain>'}/api/License/public-key</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'help' && (
+          <div className="w-full max-w-5xl mx-auto space-y-8">
+            <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10">
+              <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">系统帮助与核心功能说明</h2>
+              
+              <div className="space-y-8">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center">
+                    <span className="bg-blue-100 text-blue-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">1</span>
+                    License 核心模型与设备绑定
+                  </h3>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-8 border-l-2 border-gray-100 dark:border-gray-700 ml-2">
+                    <p>系统为每个用户下发唯一的激活码。每个激活码可根据您的商业策略设置 <strong>最大设备数 (MaxDevices)</strong> 以及 <strong>到期时间 (Expiration)</strong>。</p>
+                    <p>当用户在客户端使用邮箱、激活码及设备唯一机器码（如 CPU ID / 主板序列号生成的 Hash）进行激活时，系统会自动在后台将该设备与激活码进行绑定。若超出最大设备数量，系统将拦截新设备的激活请求。</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center">
+                    <span className="bg-red-100 text-red-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-red-900 dark:text-red-300">2</span>
+                    离线 RSA 签名与防破解
+                  </h3>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-8 border-l-2 border-gray-100 dark:border-gray-700 ml-2">
+                    <p>客户端在成功请求 <code>/api/License/activate</code> 后，除了得到成功响应，还会收到一段经后端 <strong>RSA 私钥签名的授权凭证 (Signature)</strong>。</p>
+                    <p>客户端软件应内置对应的 <strong>RSA 公钥</strong>。在软件每次启动或者运行核心功能时，可以完全在离线状态下，使用公钥验证该签名是否被篡改、授权类型及过期时间是否合法，从而做到 <strong>离线强验证</strong>，有效防止网络抓包伪造响应的破解手段。</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center">
+                    <span className="bg-green-100 text-green-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-green-900 dark:text-green-300">3</span>
+                    防爆破与限流机制 (Rate Limit)
+                  </h3>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-8 border-l-2 border-gray-100 dark:border-gray-700 ml-2">
+                    <p>激活端点极易受到黑客针对性的暴力破解（尝试枚举不同的 License Key）。本系统在 <code>LicenseController.cs</code> 层启用了 <strong>Rate Limiting</strong> 策略。</p>
+                    <p>建议在生产环境中进一步结合 WAF（Web Application Firewall）及 Nginx 的 IP 频率限制，确保系统的绝对安全。一旦发现有恶意 IP 高频试错，应通过 WAF 直接将其封禁。</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center">
+                    <span className="bg-purple-100 text-purple-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-purple-900 dark:text-purple-300">4</span>
+                    Passkey 通行密钥与账号安全
+                  </h3>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-8 border-l-2 border-gray-100 dark:border-gray-700 ml-2">
+                    <p>本系统已全面采用现代化的无密码（WebAuthn / Passkey）技术及 2FA（二次验证）双重保障。</p>
+                    <p>对于系统管理员及重要客户，强烈建议在“安全与账户设置”中注册 Passkey（支持指纹、Windows Hello、FaceID 等），这不仅能提供最高级别的防钓鱼保护，也能带来极速的登录体验。</p>
+                  </div>
+                </div>
+
+              </div>
             </div>
           </div>
         )}

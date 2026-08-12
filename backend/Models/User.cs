@@ -43,9 +43,15 @@ namespace backend.Models
         [MaxLength(255)]
         public string? TwoFactorSecret { get; set; }
 
-        // === 二次安全密码 (独立于登录密码) ===
         [MaxLength(255)]
-        public string? SecondaryPasswordHash { get; set; }
+        public string? TwoFactorResetToken { get; set; }
+        public DateTime? TwoFactorResetTokenExpiry { get; set; }
+
+        // === 会话安全与防爆破互踢 ===
+        [MaxLength(255)]
+        public string? CurrentSessionToken { get; set; } // 存储当前的单点登录Token，若与请求Token不一致则视为被踢出
+        public int FailedLoginAttempts { get; set; } = 0; // 密码连续错误次数
+        public DateTime? LockoutEnd { get; set; } // 密码错误触发锁定后的解锁时间
 
         // === 通行密钥 (WebAuthn / Passkeys) ===
         public ICollection<FidoStoredCredential> FidoStoredCredentials { get; set; } = new List<FidoStoredCredential>();

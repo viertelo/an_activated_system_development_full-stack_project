@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { Key } from 'lucide-react';
+import { startAuthentication } from '@simplewebauthn/browser';
+
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,7 +16,7 @@ export default function LoginPage() {
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
+  const [forgot2FALoading, setForgot2FALoading] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -45,6 +48,9 @@ export default function LoginPage() {
 
       if (data.userId) {
         localStorage.setItem('user', JSON.stringify({ userId: data.userId, role: data.role }));
+        if (data.sessionToken) {
+          localStorage.setItem('sessionToken', data.sessionToken);
+        }
       }
       router.push('/admin');
       
@@ -56,9 +62,87 @@ export default function LoginPage() {
     }
   };
 
+  const handleForgot2FA = async () => {
+    if (!email || !email.includes('@')) {
+      toast.error('请先在上方输入您的邮箱地址');
+      return;
+    }
+
+    setForgot2FALoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/2fa/forgot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || '重置链接已发送到该邮箱。');
+      } else {
+        toast.error(data.message || '发送失败，请检查邮箱是否正确。');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('网络或服务器错误，请稍后再试。');
+    } finally {
+      setForgot2FALoading(false);
+    }
+  };
+
+  const handlePasskeyLogin = async () => {
+    if (!email || !email.includes('@')) {
+      toast.error('请先输入您的邮箱地址以进行通行密钥登录。');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Get assertion options from server
+      const resp = await fetch(`/api/passkey/assertionOptions?email=${encodeURIComponent(email)}`, { method: 'POST' });
+      if (!resp.ok) {
+        const errorMsg = await resp.json();
+        throw new Error(errorMsg.Message || errorMsg.ErrorMessage || '无法获取登录选项，可能是该账号未绑定通行密钥');
+      }
+      const options = await resp.json();
+
+      // 2. Prompt user to authenticate
+      const asseResp = await startAuthentication(options);
+
+      // 3. Send response back to server
+      const verifyResp = await fetch(`/api/passkey/makeAssertion?email=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(asseResp),
+      });
+
+      const data = await verifyResp.json();
+
+      if (verifyResp.ok) {
+        if (data.userId) {
+          localStorage.setItem('user', JSON.stringify({ userId: data.userId, role: data.role }));
+          if (data.sessionToken) {
+            localStorage.setItem('sessionToken', data.sessionToken);
+          }
+        }
+        toast.success('通行密钥登录成功');
+        router.push('/admin');
+      } else {
+        throw new Error(data.ErrorMessage || '登录验证失败');
+      }
+    } catch (err: any) {
+      toast.error(err.message || '通行密钥登录取消或发生错误');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 sm:p-8 dark:bg-gray-900">
-      <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 sm:p-10 dark:bg-gray-800 dark:ring-white/10">
+      <div className="relative w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 sm:p-10 dark:bg-gray-800 dark:ring-white/10">
+        <div className="absolute top-4 right-4">
+          <ThemeSwitcher />
+        </div>
         <div>
           <h2 className="mt-2 text-center text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
             系统授权与登录
@@ -118,9 +202,19 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label htmlFor="twoFactorCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                2FA 动态密码 (若未开启请留空)
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="twoFactorCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  2FA 动态密码 (若未开启请留空)
+                </label>
+                <button
+                  type="button"
+                  onClick={handleForgot2FA}
+                  disabled={forgot2FALoading}
+                  className="text-sm font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 disabled:opacity-50"
+                >
+                  {forgot2FALoading ? '发送中...' : '丢失验证器？'}
+                </button>
+              </div>
               <div className="mt-1">
                 <input
                   id="twoFactorCode"
@@ -152,8 +246,9 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
-              className="flex w-full items-center justify-center space-x-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600 transition-colors"
-              onClick={() => toast.error('Passkey 功能尚未初始化')}
+              disabled={loading}
+              onClick={handlePasskeyLogin}
+              className="flex w-full items-center justify-center space-x-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
             >
               <Key className="h-4 w-4" />
               <span>通行密钥 (Passkey) 快捷登录</span>

@@ -1,19 +1,18 @@
 using backend.Data;
 using backend.Models;
+using backend.Filters;
 using Fido2NetLib;
 using Fido2NetLib.Objects;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [SessionAuth]
     public class PasskeyController : ControllerBase
     {
         private readonly IFido2 _fido2;
@@ -25,12 +24,14 @@ namespace backend.Controllers
             _context = context;
         }
 
+        private string FormatOptionsSessionKey(string email) => $"fido2_options_{email}";
+
         // --- Registration ---
 
         [HttpPost("makeCredentialOptions")]
         public async Task<IActionResult> MakeCredentialOptions([FromQuery] string email)
         {
-            var user = await _context.Users.Include(u => u.FidoStoredCredentials).FirstOrDefaultAsync(u => u.Email == email);
+            var user = await _context.Users.AsNoTracking().Include(u => u.FidoStoredCredentials).FirstOrDefaultAsync(u => u.Email == email);
             if (user == null) return NotFound("User not found");
 
             var fidoUser = new Fido2User
@@ -44,19 +45,22 @@ namespace backend.Controllers
                 .Select(c => new PublicKeyCredentialDescriptor(c.CredentialId))
                 .ToList();
 
-            // Simplified stub for prototype
-            var options = new
+            var authenticatorSelection = new AuthenticatorSelection
             {
-                Challenge = new byte[32],
-                Rp = new { Name = "激活系统通行密钥服务", Id = "localhost" },
-                User = new { Id = fidoUser.Id, Name = fidoUser.Name, DisplayName = fidoUser.DisplayName },
-                PubKeyCredParams = new[] { new { Type = "public-key", Alg = -7 } },
-                Timeout = 60000,
-                Attestation = "none",
-                AuthenticatorSelection = new { ResidentKey = "required", UserVerification = "required" }
+                ResidentKey = ResidentKeyRequirement.Required,
+                UserVerification = UserVerificationRequirement.Required
             };
 
-            // In production, save options.ToJson() in session/redis for verification
+            var options = _fido2.RequestNewCredential(new RequestNewCredentialParams
+            {
+                User = fidoUser,
+                ExcludeCredentials = existingKeys,
+                AuthenticatorSelection = authenticatorSelection,
+                AttestationPreference = AttestationConveyancePreference.None
+            });
+
+            HttpContext.Session.SetString(FormatOptionsSessionKey(email), options.ToJson());
+
             return Ok(options);
         }
 
@@ -66,27 +70,49 @@ namespace backend.Controllers
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
             if (user == null) return NotFound("User not found");
 
-            // In production, retrieve the options from session/redis. For demo, we just return Ok.
-            // A full implementation would call _fido2.MakeNewCredentialAsync(...)
-            
-            // Stub implementation for demonstration purposes (since full FIDO2 requires session state)
+            var jsonOptions = HttpContext.Session.GetString(FormatOptionsSessionKey(email));
+            if (string.IsNullOrEmpty(jsonOptions))
+            {
+                return BadRequest("Invalid session or session expired.");
+            }
+
+            var options = CredentialCreateOptions.FromJson(jsonOptions);
+
+            IsCredentialIdUniqueToUserAsyncDelegate callback = async (args, cancellationToken) =>
+            {
+                var usersWithCred = await _context.FidoStoredCredentials
+                    .Where(c => c.CredentialId == args.CredentialId)
+                    .ToListAsync();
+                return !usersWithCred.Any();
+            };
+
+            var success = await _fido2.MakeNewCredentialAsync(new MakeNewCredentialParams
+            {
+                AttestationResponse = attestationResponse,
+                OriginalOptions = options,
+                IsCredentialIdUniqueToUserCallback = callback
+            }, cancellationToken: CancellationToken.None);
+
             var newCred = new FidoStoredCredential
             {
                 Username = user.Email,
                 UserId = Encoding.UTF8.GetBytes(user.Id.ToString()),
-                PublicKey = new byte[32], // Stub
-                UserHandle = new byte[32], // Stub
-                SignatureCounter = 0,
-                CredType = "public-key",
+                PublicKey = success.PublicKey,
+                UserHandle = success.User.Id,
+                SignatureCounter = success.SignCount,
+                CredType = "public-key", // Assuming default string here
                 RegDate = DateTime.UtcNow,
-                AaGuid = Guid.NewGuid(),
-                CredentialId = new byte[32], // Stub
+                AaGuid = success.AaGuid,
+                CredentialId = success.Id,
                 UserEntityId = user.Id
             };
-            
+
             _context.FidoStoredCredentials.Add(newCred);
             await _context.SaveChangesAsync();
-            
+
+            // Clear session
+            HttpContext.Session.Remove(FormatOptionsSessionKey(email));
+
             return Ok(new { Status = "ok", ErrorMessage = "" });
         }
 
@@ -95,35 +121,77 @@ namespace backend.Controllers
         [HttpPost("assertionOptions")]
         public async Task<IActionResult> AssertionOptions([FromQuery] string email)
         {
-            var user = await _context.Users.Include(u => u.FidoStoredCredentials).FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null) return NotFound("User not found");
-
-            var existingCredentials = user.FidoStoredCredentials
-                .Select(c => new PublicKeyCredentialDescriptor(c.CredentialId))
-                .ToList();
-
-            // Simplified stub for prototype
-            var options = new
+            var user = await _context.Users.AsNoTracking().Include(u => u.FidoStoredCredentials).FirstOrDefaultAsync(u => u.Email == email);
+            if (user == null)
             {
-                Challenge = new byte[32],
-                RpId = "localhost",
-                AllowCredentials = existingCredentials,
-                UserVerification = "required",
-                Timeout = 60000
-            };
+                return NotFound(new { Message = "未找到该用户。" });
+            }
 
-            // In production, save options in session/redis
+            if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
+            {
+                var remainingMinutes = (int)(user.LockoutEnd.Value - DateTime.UtcNow).TotalMinutes + 1;
+                return Unauthorized(new { Message = $"密码错误次数过多，账号已锁定，请 {remainingMinutes} 分钟后再试。" });
+            }
+
+            var existingCredentials = user.FidoStoredCredentials.Select(c => new PublicKeyCredentialDescriptor(c.CredentialId)).ToList();
+            if (!existingCredentials.Any())
+            {
+                return BadRequest(new { Message = "该账号未绑定任何通行密钥。" });
+            }
+
+            var options = _fido2.GetAssertionOptions(new GetAssertionOptionsParams
+            {
+                AllowedCredentials = existingCredentials,
+                UserVerification = UserVerificationRequirement.Required
+            });
+
+            HttpContext.Session.SetString(FormatOptionsSessionKey(email), options.ToJson());
+
             return Ok(options);
         }
 
         [HttpPost("makeAssertion")]
         public async Task<IActionResult> MakeAssertion([FromBody] AuthenticatorAssertionRawResponse clientResponse, [FromQuery] string email)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            var user = await _context.Users.Include(u => u.FidoStoredCredentials).FirstOrDefaultAsync(u => u.Email == email);
             if (user == null) return NotFound("User not found");
 
-            // Stub implementation for login assertion verification
-            // In production: _fido2.MakeAssertionAsync(...)
+            var jsonOptions = HttpContext.Session.GetString(FormatOptionsSessionKey(email));
+            if (string.IsNullOrEmpty(jsonOptions))
+            {
+                return BadRequest("Invalid session or session expired.");
+            }
+
+            var options = Fido2NetLib.AssertionOptions.FromJson(jsonOptions);
+
+            var clientResponseIdBytes = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlDecode(clientResponse.Id);
+            var storedCred = user.FidoStoredCredentials.FirstOrDefault(c => c.CredentialId.SequenceEqual(clientResponseIdBytes));
+            if (storedCred == null)
+            {
+                return BadRequest("Unknown credential");
+            }
+
+            IsUserHandleOwnerOfCredentialIdAsync callback = async (args, cancellationToken) =>
+            {
+                return storedCred.UserHandle.SequenceEqual(args.UserHandle);
+            };
+
+            var success = await _fido2.MakeAssertionAsync(new MakeAssertionParams
+            {
+                AssertionResponse = clientResponse,
+                OriginalOptions = options,
+                StoredPublicKey = storedCred.PublicKey,
+                StoredSignatureCounter = storedCred.SignatureCounter,
+                IsUserHandleOwnerOfCredentialIdCallback = callback
+            }, cancellationToken: CancellationToken.None);
+
+            // Update counter
+            storedCred.SignatureCounter = success.SignCount;
+
+            // Reset lockout and issue Session Token
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
+            user.CurrentSessionToken = Guid.NewGuid().ToString();
             
             _context.AuditLogs.Add(new AuditLog
             {
@@ -133,12 +201,17 @@ namespace backend.Controllers
                 IsSuccess = true,
                 Details = "WebAuthn assertion success"
             });
+
             await _context.SaveChangesAsync();
+
+            // Clear session
+            HttpContext.Session.Remove(FormatOptionsSessionKey(email));
 
             return Ok(new { 
                 Message = "登录成功", 
                 UserId = user.Id, 
-                Role = user.Role 
+                Role = user.Role,
+                SessionToken = user.CurrentSessionToken
             });
         }
     }

@@ -3,6 +3,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using backend.Data;
 using backend.Services;
+using backend.Filters;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,16 +12,19 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [SessionAuth] // 应用单设备会话互踢与全局鉴权
     // [Authorize(Roles = "Admin")] // 警告：生产环境必须解除此注释并接入认证中间件！
     public class AdminController : ControllerBase
     {
         private readonly AdminService _adminService;
         private readonly AppDbContext _context;
+        private readonly IMemoryCache _cache;
 
-        public AdminController(AdminService adminService, AppDbContext context)
+        public AdminController(AdminService adminService, AppDbContext context, IMemoryCache cache)
         {
             _adminService = adminService;
             _context = context;
+            _cache = cache;
         }
 
         [HttpGet("audit-logs")]
@@ -40,7 +45,7 @@ namespace backend.Controllers
                 query = query.Where(l => l.Timestamp <= endDate.Value);
 
             // 默认返回最近100条记录，避免数据量过大
-            var logs = await query.OrderByDescending(l => l.Timestamp).Take(100).ToListAsync();
+            var logs = await query.AsNoTracking().OrderByDescending(l => l.Timestamp).Take(100).ToListAsync();
 
             return Ok(logs);
         }
@@ -63,16 +68,25 @@ namespace backend.Controllers
         [HttpGet("stats")]
         public async Task<IActionResult> GetStats()
         {
+            const string cacheKey = "AdminStatsCache";
+            
+            if (_cache.TryGetValue(cacheKey, out object? cachedStats))
+            {
+                return Ok(cachedStats);
+            }
+
             var today = DateTime.UtcNow.Date;
             var sevenDaysAgo = today.AddDays(-6); // Include today
 
             // 获取7天内的激活成功日志
             var activationLogs = await _context.AuditLogs
+                .AsNoTracking()
                 .Where(l => l.Timestamp >= sevenDaysAgo && l.Action == "DeviceActivate" && l.IsSuccess == true)
                 .ToListAsync();
 
             // 获取7天内的风控拦截日志
             var blockedLogs = await _context.AuditLogs
+                .AsNoTracking()
                 .Where(l => l.Timestamp >= sevenDaysAgo && l.Action == "RateLimitBlocked")
                 .ToListAsync();
 
@@ -86,17 +100,25 @@ namespace backend.Controllers
                 chartData.Add(new { Date = targetDate.ToString("MM-dd"), Activations = actCount, Blocks = blockCount });
             }
 
-            var totalActiveLicenses = await _context.Licenses.CountAsync(l => l.IsActive && (!l.ExpirationDate.HasValue || l.ExpirationDate > DateTime.UtcNow));
-            var totalDevices = await _context.Devices.CountAsync();
+            var totalActiveLicenses = await _context.Licenses.AsNoTracking().CountAsync(l => l.IsActive && (!l.ExpirationDate.HasValue || l.ExpirationDate > DateTime.UtcNow));
+            var totalDevices = await _context.Devices.AsNoTracking().CountAsync();
 
-            return Ok(new
+            var statsData = new
             {
                 TotalActiveLicenses = totalActiveLicenses,
                 TotalDevices = totalDevices,
                 TodayActivations = activationLogs.Count(l => l.Timestamp.Date == today),
                 TodayBlocks = blockedLogs.Count(l => l.Timestamp.Date == today),
                 ChartData = chartData
-            });
+            };
+
+            // 设置缓存，过期时间为 5 分钟
+            var cacheEntryOptions = new MemoryCacheEntryOptions()
+                .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+            _cache.Set(cacheKey, statsData, cacheEntryOptions);
+
+            return Ok(statsData);
         }
 
         [HttpPost("revoke-license/{id}")]
@@ -112,6 +134,7 @@ namespace backend.Controllers
         public async Task<IActionResult> GetUsers()
         {
             var users = await _context.Users
+                .AsNoTracking()
                 .OrderByDescending(u => u.CreatedAt)
                 .Select(u => new 
                 {
@@ -159,6 +182,37 @@ namespace backend.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { Message = "用户已删除。" });
+        }
+
+        public class ResetUserPasswordRequest
+        {
+            public string NewPassword { get; set; } = string.Empty;
+        }
+
+        [HttpPost("users/{id}/password")]
+        public async Task<IActionResult> ResetUserPassword(Guid id, [FromBody] ResetUserPasswordRequest request)
+        {
+            if (string.IsNullOrEmpty(request.NewPassword) || request.NewPassword.Length < 6)
+            {
+                return BadRequest(new { Message = "密码长度至少需要 6 个字符。" });
+            }
+
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound(new { Message = "未找到该用户。" });
+
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(request.NewPassword);
+            var hash = sha256.ComputeHash(bytes);
+            user.PasswordHash = Convert.ToBase64String(hash);
+            
+            // 踢出用户的当前会话（为了安全，重置密码后使当前设备外都失效）
+            user.CurrentSessionToken = Guid.NewGuid().ToString();
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "用户密码已重置成功。" });
         }
     }
 

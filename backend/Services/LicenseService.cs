@@ -78,22 +78,65 @@ namespace backend.Services
                 return (true, license);
             }
 
-            // 4. 检查当前绑定设备数量是否超限
-            var currentDeviceCount = await _context.Devices.CountAsync(d => d.LicenseId == license.Id);
-            if (currentDeviceCount >= license.MaxDevices)
+            // 4. 检查总激活次数限制
+            if (license.MaxActivations > 0 && license.CurrentActivationCount >= license.MaxActivations)
             {
-                // 达到了最大设备限制
                 _context.AuditLogs.Add(new AuditLog
                 {
                     Action = "DeviceActivate",
                     Operator = hardwareId,
                     Target = $"LicenseId:{license.Id}",
                     IsSuccess = false,
-                    Details = "超过最大设备限制"
+                    Details = $"已达到终生最大激活次数限制 ({license.MaxActivations}次)"
                 });
                 await _context.SaveChangesAsync();
                 return (false, null);
             }
+
+            // 5. 检查当前绑定设备数量是否超限 及 换绑逻辑
+            var currentDeviceCount = await _context.Devices.CountAsync(d => d.LicenseId == license.Id);
+            if (currentDeviceCount >= license.MaxDevices)
+            {
+                if (license.AllowDeviceTransfer)
+                {
+                    // 允许换绑：查找并解绑最早激活的一台设备
+                    var oldestDevice = await _context.Devices
+                        .Where(d => d.LicenseId == license.Id)
+                        .OrderBy(d => d.ActivatedAt)
+                        .FirstOrDefaultAsync();
+                    
+                    if (oldestDevice != null)
+                    {
+                        _context.Devices.Remove(oldestDevice);
+                        _context.AuditLogs.Add(new AuditLog
+                        {
+                            Action = "DeviceAutoTransfer",
+                            Operator = hardwareId,
+                            Target = $"LicenseId:{license.Id}",
+                            IsSuccess = true,
+                            Details = $"自动解绑老设备 {oldestDevice.HardwareId}"
+                        });
+                        // 移除后继续下面的绑定新设备流程
+                    }
+                }
+                else
+                {
+                    // 不允许换绑，且达到了最大设备限制
+                    _context.AuditLogs.Add(new AuditLog
+                    {
+                        Action = "DeviceActivate",
+                        Operator = hardwareId,
+                        Target = $"LicenseId:{license.Id}",
+                        IsSuccess = false,
+                        Details = "超过最大设备限制且不允许换绑"
+                    });
+                    await _context.SaveChangesAsync();
+                    return (false, null);
+                }
+            }
+
+            // 6. 绑定新设备并增加激活次数统计
+            license.CurrentActivationCount++;
 
             // 5. 绑定新设备
             var newDevice = new Device

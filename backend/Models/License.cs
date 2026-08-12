@@ -20,6 +20,21 @@ namespace backend.Models
         
         public Guid UserId { get; set; }
         public User? User { get; set; }
+
+        /// <summary>
+        /// 是否允许设备换绑。若允许，当达到最大设备数时，新设备激活将自动解绑最旧的设备。
+        /// </summary>
+        public bool AllowDeviceTransfer { get; set; } = false;
+
+        /// <summary>
+        /// 历史总共允许的激活次数限制。超过该次数将无法激活（即使当前绑定设备数为0）。0 表示不限制。
+        /// </summary>
+        public int MaxActivations { get; set; } = 0;
+
+        /// <summary>
+        /// 当前已使用的激活次数
+        /// </summary>
+        public int CurrentActivationCount { get; set; } = 0;
         
         /// <summary>
         /// 状态：是否激活、是否被吊销等

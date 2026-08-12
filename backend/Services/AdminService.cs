@@ -21,7 +21,7 @@ namespace backend.Services
         /// 生成一个新的或多个 License
         /// 仅返回明文一次，数据库内部只保存 Hash 值
         /// </summary>
-        public async Task<List<string>> GenerateLicensesAsync(Guid userId, int maxDevices, int count, string licenseType, DateTime? expirationDate, string operatorName)
+        public async Task<List<string>> GenerateLicensesAsync(Guid userId, int maxDevices, int count, string licenseType, DateTime? expirationDate, string operatorName, bool allowDeviceTransfer, int maxActivations)
         {
             var plainKeys = new List<string>();
             var newLicenses = new List<License>();
@@ -38,7 +38,9 @@ namespace backend.Services
                     UserId = userId,
                     IsActive = true,
                     LicenseType = licenseType,
-                    ExpirationDate = expirationDate
+                    ExpirationDate = expirationDate,
+                    AllowDeviceTransfer = allowDeviceTransfer,
+                    MaxActivations = maxActivations
                 });
                 plainKeys.Add(plainKey);
             }

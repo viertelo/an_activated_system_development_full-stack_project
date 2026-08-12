@@ -59,7 +59,7 @@ namespace backend.Controllers
             int count = request.Count > 0 ? request.Count : 1;
             string licenseType = string.IsNullOrEmpty(request.LicenseType) ? "Permanent" : request.LicenseType;
             
-            var newKeys = await _adminService.GenerateLicensesAsync(request.UserId, request.MaxDevices, count, licenseType, request.ExpirationDate, operatorName);
+            var newKeys = await _adminService.GenerateLicensesAsync(request.UserId, request.MaxDevices, count, licenseType, request.ExpirationDate, operatorName, request.AllowDeviceTransfer, request.MaxActivations);
             
             // 仅在此处返回明文激活码供后台显示或邮件发送。之后再也无法从数据库读取明文。
             return Ok(new { LicenseKeys = newKeys, Message = $"成功批量生成 {count} 张激活码并已将哈希安全入库。" });
@@ -223,5 +223,7 @@ namespace backend.Controllers
         public int Count { get; set; } = 1;
         public string? LicenseType { get; set; }
         public DateTime? ExpirationDate { get; set; }
+        public bool AllowDeviceTransfer { get; set; } = false;
+        public int MaxActivations { get; set; } = 0;
     }
 }

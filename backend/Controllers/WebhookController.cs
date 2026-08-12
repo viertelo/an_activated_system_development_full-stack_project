@@ -67,7 +67,9 @@ namespace backend.Controllers
                         1,
                         payload.LicenseType,
                         DateTime.UtcNow.AddYears(1), // Expiration default to 1 year
-                        $"Order:{payload.OrderId}"
+                        $"Order:{payload.OrderId}",
+                        false,
+                        0
                     );
 
                     _context.AuditLogs.Add(new AuditLog

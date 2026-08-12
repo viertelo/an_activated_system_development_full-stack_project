@@ -87,7 +87,7 @@ namespace backend.Controllers
             await _context.SaveChangesAsync();
 
             // 生成新的明文激活码 (默认 MaxDevices 继承旧版逻辑，这里简化为 1)
-            var plainKeys = await _adminService.GenerateLicensesAsync(user.Id, 1, 1, "Permanent", null, "SystemReset");
+            var plainKeys = await _adminService.GenerateLicensesAsync(user.Id, 1, 1, "Permanent", null, "SystemReset", false, 0);
             var plainKey = plainKeys[0];
 
             // 将新激活码发到用户邮箱

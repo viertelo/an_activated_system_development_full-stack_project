@@ -86,6 +86,8 @@ export default function AdminDashboard() {
   const [twoFactorVerifyCode, setTwoFactorVerifyCode] = useState('');
   const [licenseType, setLicenseType] = useState('Permanent');
   const [expirationDate, setExpirationDate] = useState('');
+  const [allowDeviceTransfer, setAllowDeviceTransfer] = useState(false);
+  const [maxActivations, setMaxActivations] = useState(0);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [error, setError] = useState('');
@@ -263,7 +265,9 @@ export default function AdminDashboard() {
           maxDevices, 
           count, 
           licenseType, 
-          expirationDate: expirationDate ? new Date(expirationDate).toISOString() : null 
+          expirationDate: expirationDate ? new Date(expirationDate).toISOString() : null,
+          allowDeviceTransfer,
+          maxActivations
         }),
       });
 
@@ -596,6 +600,30 @@ export default function AdminDashboard() {
                       min="1"
                       value={maxDevices}
                       onChange={(e) => setMaxDevices(parseInt(e.target.value))}
+                      className="mt-1 block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="flex items-center mt-6">
+                    <input
+                      type="checkbox"
+                      id="allowDeviceTransfer"
+                      checked={allowDeviceTransfer}
+                      onChange={(e) => setAllowDeviceTransfer(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700"
+                    />
+                    <label htmlFor="allowDeviceTransfer" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      允许自动换绑 (满设备时踢老设备)
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">终生总激活次数 (0为不限)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={maxActivations}
+                      onChange={(e) => setMaxActivations(parseInt(e.target.value))}
                       className="mt-1 block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 dark:bg-gray-700 dark:text-white"
                     />
                   </div>

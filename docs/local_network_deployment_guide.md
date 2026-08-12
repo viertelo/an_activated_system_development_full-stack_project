@@ -32,7 +32,14 @@
 3. **访问系统**：
    打开浏览器，访问 `http://<您的局域网IP>:8080` 即可直接使用完整的前后端系统。
 
-> 这套配置使用了完全独立的 Docker 网络 (`activation_net_lan`) 和数据卷 (`pgdata_lan`)，即使将来您在同一台机器上运行生产外网版，两者也**绝对不会发生任何冲突**。
+> 这套配置使用了完全独立的 Docker 网络 (`activation_net_lan`) 和本地映射卷 (`data/db` 与 `data/keys`)。
+
+> **⚠️ 注意事项 (针对 Linux/Mac 用户)**
+> 首次运行前，请确保在根目录赋予 data 文件夹读取和写入权限，以防止非特权 Docker 容器报错无权限。
+> ```bash
+> mkdir -p data/db data/keys
+> chmod -R 777 data/
+> ```
 
 ---
 
@@ -131,13 +138,13 @@ dotnet publish -c Release -r linux-x64 --self-contained false -o ./publish
 ```nginx
 # Nginx 配置示例片段 (参考项目前端目录下的 nginx.conf，我们已为您编写了最高安全级别的完整配置)
 server {
-    listen 80;
+    listen 8080;
     server_name activate.yourdomain.com;
     return 301 https://$host$request_uri; # 强制 HTTPS 跳转
 }
 
 server {
-    listen 443 ssl http2;
+    listen 8443 ssl http2;
     server_name activate.yourdomain.com;
     
     # 强制 HTTPS 的 SSL 证书路径
@@ -261,8 +268,8 @@ SMTP_PASS=your_smtp_auth_code
 ```bash
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow 80/tcp     # 仅放行 Nginx HTTP (用于重定向)
-sudo ufw allow 443/tcp    # 仅放行 Nginx HTTPS
+sudo ufw allow 8080/tcp     # 仅放行 Nginx HTTP (用于重定向或本地测试)
+sudo ufw allow 8443/tcp     # 仅放行 Nginx HTTPS
 sudo ufw allow 12345/tcp  # 放行您修改后的自定义 SSH 端口
 sudo ufw enable
 ```

@@ -4,13 +4,13 @@
 
 ---
 
-## 1. 基础防灾恢复 (Docker Volume 持久化)
+## 1. 基础防灾恢复 (本地持久化映射)
 
-本系统采用 Docker Compose 进行服务编排。在 `docker-compose.yml` 中，我们将 PostgreSQL 数据库的文件映射到了宿主机的 Docker Volume (`pgdata` 或 `pgdata_lan`)。
+本系统采用 Docker Compose 进行服务编排。在 `docker-compose.yml` 中，我们将 PostgreSQL 数据库的文件和 RSA 密钥分别直接映射到了宿主机的物理目录 (`data/db` 和 `data/keys`)。
 
 **防护效果：**
-- **防止误删容器**：即使您错误地执行了 `docker-compose down` 销毁了所有的应用和数据库容器，或者服务器意外断电重启，数据库数据**依然会安全地保留在宿主机的物理硬盘中**。
-- **快速恢复**：您只需再次执行 `docker-compose up -d`，新启动的数据库容器会自动挂载硬盘上的数据卷，系统瞬间满血复活，激活码不会有任何丢失。
+- **防止误删容器**：即使您错误地执行了 `docker-compose down` 销毁了所有的应用和数据库容器，或者服务器意外断电重启，数据库数据与密钥**依然会安全地保留在宿主机的物理硬盘中**。
+- **快速恢复**：您只需再次执行 `docker-compose up -d`，新启动的容器会自动挂载硬盘上的数据，系统瞬间满血复活，激活码不会有任何丢失。
 
 ---
 
@@ -19,7 +19,7 @@
 虽然 Docker Volume 防止了容器级的灾难，但如果**服务器整机硬盘损坏、重装系统或遭遇勒索病毒**，数据仍有彻底丢失的风险。为了防御物理级别的毁灭打击，我们为您准备了自动化备份脚本。
 
 ### 2.1 自动化备份脚本 (`scripts/backup.sh`)
-我们在项目根目录的 `scripts` 文件夹下为您准备了 `backup.sh`，它可以一键利用 `pg_dump` 将数据库完整导出为安全的二进制转储文件 (`.dump`)，并自动清理 7 天前的旧备份。
+我们在项目根目录的 `scripts` 文件夹下为您准备了 `backup.sh`，它可以一键利用 `pg_dump` 将数据库完整导出为安全的二进制转储文件 (`.dump`)，并**同时将您的 RSA 公私钥文件夹 (`data/keys`) 打包为 `.tar.gz` 压缩包**，自动清理 7 天前的旧备份。
 
 **配置自动备份 (Linux Crontab)：**
 
@@ -46,8 +46,12 @@
 ### 恢复步骤：
 
 1. **部署新环境**：在新服务器克隆本项目代码，配置好 `.env`，并执行 `docker-compose up -d` 启动全新的空壳环境。
-2. **上传备份文件**：将您在本地或异地保存的 `.dump` 备份文件上传到新服务器（例如传至 `/root/activation_backup_xxx.dump`）。
-3. **清空初始空壳库**：
+2. **上传备份文件**：将您在本地或异地保存的 `.dump` 数据库备份文件和 `.tar.gz` 密钥包上传到新服务器。
+3. **恢复 RSA 密钥**：解压 `.tar.gz` 文件并覆盖到 `data/keys` 目录：
+   ```bash
+   tar -xzf /root/activation_keys_xxx.tar.gz -C ./
+   ```
+4. **清空初始空壳库**：
    在导入前，必须先断开并清空由代码自动生成的空壳数据结构（防止主键冲突），在服务器终端执行：
    ```bash
    # 删除空库
@@ -55,9 +59,9 @@
    # 建立新库
    docker exec -t activation_db createdb -U activate_admin activation_db
    ```
-4. **导入备份数据**：
+5. **导入备份数据**：
    使用 `pg_restore` 恢复物理备份文件（注意替换最后的路径为您实际的备份文件路径）：
    ```bash
-   docker exec -i activation_db pg_restore -U activate_admin -d activation_db -1 < /root/activation_backup_xxx.dump
+   docker exec -i activation_db pg_restore -U activate_admin -d activation_db -1 < /root/activation_db_xxx.dump
    ```
-5. **恢复完成**：导入成功后，您通过 Web 浏览器或 API 访问，所有管理员账号、激活码资产、设备指纹等数据将**原封不动地全部归位**，系统恢复正常营业！
+6. **恢复完成**：导入成功后，您通过 Web 浏览器或 API 访问，所有管理员账号、激活码资产、设备指纹等数据将**原封不动地全部归位**，系统恢复正常营业！

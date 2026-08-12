@@ -38,7 +38,7 @@
 │   ├── disaster_recovery_and_backup.md
 │   └── local_network_deployment_guide.md
 ├── docker-compose.yml      # 🐳 一键生产部署编排文件 (强制 HTTPS 外网访问)
-├── docker-compose.lan.yml  # 🏠 局域网无外网部署编排 (HTTP 测试环境专用)
+├── docker-compose.lan.yml  # 🏠 局域网无外网部署编排 (HTTP 8080端口，测试环境专用)
 ├── .env.example            # ⚙️ 生产环境配置模板
 └── README.md               # 📖 项目首页说明
 ```
@@ -76,7 +76,7 @@
    ```bash
    docker-compose -f docker-compose.lan.yml --env-file .env.lan up -d --build
    ```
-> 这套配置覆盖了强制 HTTPS 安全策略，使用独立的数据库映射卷（`pgdata_lan`），与生产环境数据互不干扰。
+> 这套配置使用了本地磁盘的直接映射（`data/db` 和 `data/keys`），保证了即使删库也能一比一完美恢复。与外网版本完全物理隔离，绝不会互相干扰。
 
 ---
 

@@ -36,8 +36,8 @@
 5. 后端将原始明文激活码返回给管理员，并发送给客户。（一旦错过，连系统管理员也无法再次看到该激活码）。
 
 ### 2.2 客户端激活流程 (Client Activation Flow)
-1. 客户端软件收集用户硬件指纹（如 CPU ID + 主板序列号），与用户输入的激活码明文一起打包。
-2. 客户端向服务器发起 `POST /api/license/activate` 请求。
+1. 客户端软件收集用户硬件指纹（如 CPU ID + 主板序列号），与用户输入的激活码明文以及绑定的邮箱地址一起打包。
+2. 客户端向服务器发起 `POST /api/license/activate` 请求，并在请求体验证邮箱与 License 的归属关系。
 3. 服务器收到明文激活码后，再次进行 SHA256 运算，得出哈希值。
 4. 服务器拿着这个哈希值去数据库里比对。
 5. **比对成功**：
@@ -71,7 +71,9 @@
   {
     "userId": "client_uuid_123",
     "maxDevices": 1,
-    "expireDate": "2027-01-01T00:00:00Z"
+    "count": 1,
+    "licenseType": "Permanent",
+    "expirationDate": "2027-01-01T00:00:00Z"
   }
   ```
 - **测试结果预期**: 返回一个纯文本形式的明文激活码（例如 `LIC-A1B2...`）。
@@ -82,6 +84,7 @@
 - **请求体 (JSON)**:
   ```json
   {
+    "email": "user@example.com",
     "licenseKey": "LIC-A1B2... (刚才生成的明文)",
     "hardwareId": "HW-CPU-12345678"
   }
@@ -92,6 +95,12 @@
 - **功能描述**: 当客户更换电脑，需要解绑旧电脑时使用。
 - **请求方式**: `DELETE`
 - **URL**: `http://<您的服务器IP>/api/device/remove/{deviceId}`
+
+### 3.4 人员与角色管理 (管理员接口)
+- **功能描述**: 查询系统中注册的用户、更改用户角色（提权）或删除用户。
+- **获取用户列表**: `GET /api/admin/users`
+- **更改角色 (Admin/User)**: `PUT /api/admin/users/{id}/role` (请求体 `{"role": "Admin"}`)
+- **删除用户**: `DELETE /api/admin/users/{id}`
 
 ---
 

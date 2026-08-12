@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'react-hot-toast';
+import { Key } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,13 +43,13 @@ export default function LoginPage() {
         throw new Error(data.message || '登录失败，请检查凭据。');
       }
 
-      alert('登录成功！');
       if (data.userId) {
         localStorage.setItem('user', JSON.stringify({ userId: data.userId, role: data.role }));
       }
       router.push('/admin');
       
     } catch (err: any) {
+      toast.error(err.message || '系统内部错误，请稍后重试。');
       setError(err.message || '系统内部错误，请稍后重试。');
     } finally {
       setLoading(false);
@@ -135,18 +137,26 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 text-center dark:text-red-400 font-medium">
+            <div className="text-sm text-red-600 text-center dark:text-red-400 font-medium bg-red-50 dark:bg-red-900/20 p-2 rounded-md">
               {error}
             </div>
           )}
 
-          <div>
+          <div className="space-y-3">
             <button
               type="submit"
               disabled={loading}
               className="flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:bg-blue-400 transition-colors"
             >
               {loading ? '正在验证...' : '授权登录'}
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center justify-center space-x-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600 transition-colors"
+              onClick={() => toast.error('Passkey 功能尚未初始化')}
+            >
+              <Key className="h-4 w-4" />
+              <span>通行密钥 (Passkey) 快捷登录</span>
             </button>
           </div>
 

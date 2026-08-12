@@ -327,6 +327,8 @@ POST /api/license/activate
   ↓
 License Server
   ↓
+Verify Email Binding (New Security Requirement)
+  ↓
 Validate License
   ↓
 Check Status
@@ -537,22 +539,20 @@ Security Key
 ``` text
 SuperAdmin
 Admin
-Support
-Finance
-Developer
-ReadOnly
+User (默认)
 ```
 
-例如 Support 可以：
+系统内建了**人员管理 (User Management)**模块，Admin 可以：
 
 ``` text
-查询用户
-查询 License
-查看设备
-协助设备管理
+查看系统内所有注册用户 (GET /api/admin/users)
+更改用户角色（提权为 Admin 或降级为 User）(PUT /api/admin/users/{id}/role)
+删除违规用户 (DELETE /api/admin/users/{id})
 ```
 
-但不能：
+而普通 User 角色无法访问后台敏感管理页面。
+
+但即使是 Admin，在设计上也建议不能：
 
 ``` text
 查看 Signing Private Key
@@ -1566,3 +1566,48 @@ Support
 ```
 
 这才是可长期维护和商业化运营的 License 平台。
+
+------------------------------------------------------------------------
+
+# 42. FIDO2 / 通行密钥 (Passkeys) 集成
+
+为了极大地增强账户安全性，系统支持 WebAuthn (FIDO2) 标准的通行密钥。
+
+配置要求：
+- 前端必须在 HTTPS 下运行，或者在 `localhost` 本地开发环境中运行。
+- 后端必须在配置文件（如 `.env`）中准确配置 `FIDO2_SERVER_DOMAIN` 和 `FIDO2_ORIGIN`。
+- 如果用户通过 `https://admin.example.com` 访问系统，则 `FIDO2_SERVER_DOMAIN` 应为 `admin.example.com`，`FIDO2_ORIGIN` 应为 `https://admin.example.com`。
+- 任何源不匹配的错误都会导致浏览器直接拒绝凭据生成或验证请求。
+
+------------------------------------------------------------------------
+
+# 43. 二次密码 (Secondary Password)
+
+针对高权限的安全管理操作（如分配 License、修改管理员角色、吊销 License），系统需要对当前登录的用户要求二次密码验证。
+
+- 二次密码与登录密码分离保存，分别通过不同的 Salt 进行哈希。
+- 后端提供了独立的 API 用于设置二次密码 `/api/auth/secondary-password`。
+- 高敏感操作接口需要前端在 HTTP Header 或 Payload 中附加二次密码参数。
+
+------------------------------------------------------------------------
+
+# 44. Webhook 支付与发货回调验证
+
+系统集成支付网关后，采用异步 Webhook 的形式接收付款成功回调。
+
+关键设计：
+- **签名验证**：所有的回调均包含 HMAC-SHA256 签名，必须利用分配的 Payment Secret 校验，以确保请求未经伪造。
+- **幂等性保障**：为了防止网络抖动导致的重复发货，系统设立了 `WebhookEvents` 幂等表。
+- 每次收到 Event ID，会优先执行 `INSERT ... ON CONFLICT DO NOTHING`，如果插入失败则说明已经处理过，直接返回 200。
+
+------------------------------------------------------------------------
+
+# 45. License 自动过期 Background Worker
+
+传统 Web 系统依赖用户请求触发更新，这会导致过期数据不实时。为了确保按天/订阅到期的 License 能够自动失效，系统集成了后台轮询 Worker (BackgroundService)。
+
+机制：
+- 在 `Program.cs` 启动时，`LicenseBackgroundWorker` 随之启动。
+- 设定固定时间间隔（如 1 小时或每 5 分钟）。
+- 在后台静默执行 `UPDATE Licenses SET Status = 'Expired' WHERE ExpiresAt < NOW()`。
+- 这可以确保系统内部数据状态的完全一致，不依赖外部流量或人为操作触发。

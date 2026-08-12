@@ -272,5 +272,67 @@ namespace backend.Controllers
             var hash = sha256.ComputeHash(bytes);
             return Convert.ToBase64String(hash);
         }
+
+        public class SecondaryPasswordDto
+        {
+            public Guid UserId { get; set; }
+            public string SecondaryPassword { get; set; } = string.Empty;
+        }
+
+        [HttpPost("secondary-password/setup")]
+        public async Task<IActionResult> SetupSecondaryPassword([FromBody] SecondaryPasswordDto dto)
+        {
+            var user = await _context.Users.FindAsync(dto.UserId);
+            if (user == null) return NotFound();
+
+            if (!user.IsEmailVerified)
+            {
+                return BadRequest(new { Message = "必须先完成邮件验证，才能配置二次安全密码。" });
+            }
+
+            user.SecondaryPasswordHash = HashPassword(dto.SecondaryPassword);
+            await _context.SaveChangesAsync();
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "SetupSecondaryPassword",
+                Operator = user.Email,
+                Target = $"UserId:{user.Id}",
+                IsSuccess = true,
+                Details = "成功设置了二次安全密码"
+            });
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "二次安全密码配置成功。" });
+        }
+
+        [HttpPost("secondary-password/verify")]
+        public async Task<IActionResult> VerifySecondaryPassword([FromBody] SecondaryPasswordDto dto)
+        {
+            var user = await _context.Users.FindAsync(dto.UserId);
+            if (user == null) return NotFound();
+
+            if (string.IsNullOrEmpty(user.SecondaryPasswordHash))
+            {
+                return BadRequest(new { Message = "您尚未配置二次安全密码。" });
+            }
+
+            var hashedPw = HashPassword(dto.SecondaryPassword);
+            if (user.SecondaryPasswordHash != hashedPw)
+            {
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    Action = "VerifySecondaryPassword",
+                    Operator = user.Email,
+                    Target = $"UserId:{user.Id}",
+                    IsSuccess = false,
+                    Details = "二次安全密码验证失败"
+                });
+                await _context.SaveChangesAsync();
+                return Unauthorized(new { Message = "二次安全密码不正确。" });
+            }
+
+            return Ok(new { Message = "验证成功" });
+        }
     }
 }

@@ -42,5 +42,12 @@ namespace backend.Models
         
         [MaxLength(255)]
         public string? TwoFactorSecret { get; set; }
+
+        // === 二次安全密码 (独立于登录密码) ===
+        [MaxLength(255)]
+        public string? SecondaryPasswordHash { get; set; }
+
+        // === 通行密钥 (WebAuthn / Passkeys) ===
+        public ICollection<FidoStoredCredential> FidoStoredCredentials { get; set; } = new List<FidoStoredCredential>();
     }
 }

@@ -108,6 +108,58 @@ namespace backend.Controllers
             if (success) return Ok(new { Message = "吊销成功，相关审计日志已记录。" });
             return NotFound(new { Message = "未找到该 License。" });
         }
+        [HttpGet("users")]
+        public async Task<IActionResult> GetUsers()
+        {
+            var users = await _context.Users
+                .OrderByDescending(u => u.CreatedAt)
+                .Select(u => new 
+                {
+                    u.Id,
+                    u.Email,
+                    u.Role,
+                    u.IsEmailVerified,
+                    u.CreatedAt,
+                    u.IsTwoFactorEnabled
+                })
+                .ToListAsync();
+            
+            return Ok(users);
+        }
+
+        public class UpdateRoleRequest
+        {
+            public string Role { get; set; } = string.Empty;
+        }
+
+        [HttpPut("users/{id}/role")]
+        public async Task<IActionResult> UpdateUserRole(Guid id, [FromBody] UpdateRoleRequest request)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound(new { Message = "未找到该用户。" });
+
+            if (request.Role != "Admin" && request.Role != "User")
+            {
+                return BadRequest(new { Message = "角色无效。" });
+            }
+
+            user.Role = request.Role;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "用户角色已更新。" });
+        }
+
+        [HttpDelete("users/{id}")]
+        public async Task<IActionResult> DeleteUser(Guid id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound(new { Message = "未找到该用户。" });
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "用户已删除。" });
+        }
     }
 
     public class GenerateLicenseRequest

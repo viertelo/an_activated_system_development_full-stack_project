@@ -25,7 +25,7 @@ namespace backend.Services
         /// <param name="plainLicenseKey">用户输入的原始激活码</param>
         /// <param name="hardwareId">设备的硬件指纹</param>
         /// <returns>是否激活成功</returns>
-        public async Task<(bool IsSuccess, License LicenseInfo)> ActivateDeviceAsync(string plainLicenseKey, string hardwareId)
+        public async Task<(bool IsSuccess, License? LicenseInfo)> ActivateDeviceAsync(string plainLicenseKey, string hardwareId, string email)
         {
             // 1. 哈希处理（严禁明文比对）
             var hashedKey = HashKey(plainLicenseKey);
@@ -45,6 +45,21 @@ namespace backend.Services
                     Target = "Unknown/Revoked License",
                     IsSuccess = false,
                     Details = "尝试使用不存在或已吊销的激活码"
+                });
+                await _context.SaveChangesAsync();
+                return (false, null);
+            }
+
+            if (license.User?.Email != email)
+            {
+                // 邮箱与激活码所属人不匹配
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    Action = "DeviceActivate",
+                    Operator = hardwareId,
+                    Target = $"LicenseId:{license.Id}",
+                    IsSuccess = false,
+                    Details = "尝试使用的激活码与邮箱不匹配"
                 });
                 await _context.SaveChangesAsync();
                 return (false, null);

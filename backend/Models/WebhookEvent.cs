@@ -11,6 +11,7 @@ namespace backend.Models
         public int Id { get; set; }
         public string EventId { get; set; } = string.Empty; // 支付提供商的回调唯一事件ID
         public string EventType { get; set; } = string.Empty; // 例如 "payment_intent.succeeded"
+        public string Payload { get; set; } = string.Empty; // 原始 Payload
         public DateTime ProcessedAt { get; set; } = DateTime.UtcNow;
     }
 }

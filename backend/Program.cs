@@ -3,11 +3,21 @@ using backend.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
+using Fido2NetLib;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+
+// 配置 WebAuthn (Fido2) 服务
+builder.Services.AddFido2(options =>
+{
+    options.ServerDomain = builder.Configuration["fido2:serverDomain"] ?? "localhost";
+    options.ServerName = "激活系统通行密钥服务";
+    options.Origins = new HashSet<string> { builder.Configuration["fido2:origin"] ?? "http://localhost:3000" };
+});
 
 // 添加 CORS (Cross-Origin Resource Sharing) 配置
 var allowedFrontendOrigin = builder.Configuration["FRONTEND_URL"] ?? "http://localhost:3000";
@@ -81,6 +91,9 @@ builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddSingleton<RsaKeyService>();
+
+// 注册后台定时任务
+builder.Services.AddHostedService<LicenseBackgroundWorker>();
 
 var app = builder.Build();
 

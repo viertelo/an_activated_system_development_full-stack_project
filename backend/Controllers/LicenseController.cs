@@ -113,9 +113,8 @@ namespace backend.Controllers
                 return BadRequest("参数不完整。");
             }
 
-            // 实际商用时，这里还应该通过 request.Email 去验证用户身份及归属权
-            // 本处简化为直接通过 LicenseKey 进行验证激活
-            var result = await _licenseService.ActivateDeviceAsync(request.LicenseKey, request.HardwareId);
+            // 验证用户身份及归属权
+            var result = await _licenseService.ActivateDeviceAsync(request.LicenseKey, request.HardwareId, request.Email);
 
             if (result.IsSuccess && result.LicenseInfo != null)
             {

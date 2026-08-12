@@ -34,6 +34,10 @@ services:
       SMTP_PORT: ${SMTP_PORT:-465}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASS: ${SMTP_PASS}
+      
+      # FIDO2 (Passkeys) 配置 (生产环境必须与实际域名匹配，否则无法完成 WebAuthn)
+      fido2__serverDomain: ${FIDO2_SERVER_DOMAIN:-localhost}
+      fido2__origin: ${FIDO2_ORIGIN:-https://localhost}
     depends_on:
       - db
     networks:

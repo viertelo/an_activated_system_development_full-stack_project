@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function RegisterPage() {
@@ -10,6 +10,24 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registrationEnabled, setRegistrationEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      try {
+        const res = await fetch('/api/admin/settings/registration');
+        const data = await res.json();
+        if (res.ok) {
+          setRegistrationEnabled(data.enabled);
+        } else {
+          setRegistrationEnabled(true);
+        }
+      } catch (err) {
+        setRegistrationEnabled(true);
+      }
+    };
+    checkRegistrationStatus();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +84,20 @@ export default function RegisterPage() {
           </p>
         </div>
         
-        {successMsg ? (
+        {registrationEnabled === false ? (
+          <div className="mt-8 rounded-md bg-red-50 p-4">
+            <div className="flex justify-center text-center">
+              <div>
+                <h3 className="text-sm font-medium text-red-800">当前系统已关闭注册功能，请联系管理员。</h3>
+                <div className="mt-4 text-sm">
+                  <Link href="/" className="font-semibold text-red-700 hover:text-red-600">
+                    &larr; 返回登录页面
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : successMsg ? (
           <div className="mt-8 rounded-md bg-green-50 p-4">
             <div className="flex">
               <div className="ml-3">

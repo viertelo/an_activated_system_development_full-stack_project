@@ -39,6 +39,325 @@ interface UserData {
   createdAt: string;
 }
 
+function LicenseDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string, options?: RequestInit) => Promise<Response>, setActiveTab: (tab: string) => void }) {
+  const [timeRange, setTimeRange] = useState('all');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, [timeRange, customStart, customEnd]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      let url = '/api/admin/licenses/detail';
+      if (timeRange !== 'all') {
+        const end = new Date();
+        const start = new Date();
+        if (timeRange === 'day') {
+          start.setDate(start.getDate() - 1);
+        } else if (timeRange === 'week') {
+          start.setDate(start.getDate() - 7);
+        } else if (timeRange === 'month') {
+          start.setMonth(start.getMonth() - 1);
+        } else if (timeRange === 'custom') {
+          if (customStart) start.setTime(new Date(customStart).getTime());
+          if (customEnd) end.setTime(new Date(customEnd).getTime());
+        }
+        url += `?startDate=${start.toISOString()}&endDate=${end.toISOString()}`;
+      }
+      
+      const res = await apiFetch(url);
+      if (res.ok) {
+        const result = await res.json();
+        setData(result);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-5xl mx-auto space-y-8">
+      <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              授权详细信息
+            </h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              查看所有已生成的授权信息并进行筛选。
+            </p>
+          </div>
+          <div>
+            <button onClick={() => setActiveTab('dashboard')} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 rounded text-sm font-semibold transition-colors">
+              返回大盘
+            </button>
+          </div>
+        </div>
+        <div className="flex space-x-2 mb-4 items-center">
+          <button onClick={() => setTimeRange('all')} className={`px-4 py-2 text-sm font-medium rounded ${timeRange === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>全部</button>
+          <button onClick={() => setTimeRange('day')} className={`px-4 py-2 text-sm font-medium rounded ${timeRange === 'day' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>最近一天</button>
+          <button onClick={() => setTimeRange('week')} className={`px-4 py-2 text-sm font-medium rounded ${timeRange === 'week' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>最近一周</button>
+          <button onClick={() => setTimeRange('month')} className={`px-4 py-2 text-sm font-medium rounded ${timeRange === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>最近一月</button>
+          <button onClick={() => setTimeRange('custom')} className={`px-4 py-2 text-sm font-medium rounded ${timeRange === 'custom' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>自定义日期</button>
+          
+          {timeRange === 'custom' && (
+            <div className="flex space-x-2 items-center ml-4">
+              <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              <span className="text-gray-500">-</span>
+              <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+            </div>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8 text-gray-500">加载中...</div>
+        ) : (
+          <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900/50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">已绑定设备 (激活码)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">设备限制</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                {data.map(item => (
+                  <tr key={item.id}>
+                    <td className="px-6 py-4 text-sm font-mono text-gray-900 dark:text-gray-300">
+                      {item.activatedDevices && item.activatedDevices.length > 0 ? (
+                        <div className="flex flex-col space-y-1">
+                          {item.activatedDevices.map((d: string, i: number) => <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded break-all">{d}</span>)}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">暂无设备激活</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.licenseType}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.activatedDevices?.length || 0} / {item.maxDevices}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {item.isActive ? (
+                        <span className="text-green-600">正常</span>
+                      ) : (
+                        <span className="text-red-600">封禁</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.createdAt ? new Date(item.createdAt).toLocaleString() : '-'}</td>
+                  </tr>
+                ))}
+                {data.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-500">无数据</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DeviceDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string, options?: RequestInit) => Promise<Response>, setActiveTab: (tab: string) => void }) {
+  const [timeRange, setTimeRange] = useState('all');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, [timeRange, customStart, customEnd]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      let url = '/api/admin/devices/detail';
+      if (timeRange !== 'all') {
+        const end = new Date();
+        const start = new Date();
+        if (timeRange === 'day') {
+          start.setDate(start.getDate() - 1);
+        } else if (timeRange === 'week') {
+          start.setDate(start.getDate() - 7);
+        } else if (timeRange === 'month') {
+          start.setMonth(start.getMonth() - 1);
+        } else if (timeRange === 'custom') {
+          if (customStart) start.setTime(new Date(customStart).getTime());
+          if (customEnd) end.setTime(new Date(customEnd).getTime());
+        }
+        url += `?startDate=${start.toISOString()}&endDate=${end.toISOString()}`;
+      }
+      
+      const res = await apiFetch(url);
+      if (res.ok) {
+        const result = await res.json();
+        setData(result);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-5xl mx-auto space-y-8">
+      <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              已激活设备列表
+            </h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              查看所有绑定了授权的设备及其首次激活时间。
+            </p>
+          </div>
+          <div>
+            <button onClick={() => setActiveTab('dashboard')} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 rounded text-sm font-semibold transition-colors">
+              返回大盘
+            </button>
+          </div>
+        </div>
+        <div className="flex space-x-2 mb-4 items-center">
+          <button onClick={() => setTimeRange('all')} className={`px-4 py-2 text-sm font-medium rounded ${timeRange === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>全部</button>
+          <button onClick={() => setTimeRange('day')} className={`px-4 py-2 text-sm font-medium rounded ${timeRange === 'day' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>最近一天</button>
+          <button onClick={() => setTimeRange('week')} className={`px-4 py-2 text-sm font-medium rounded ${timeRange === 'week' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>最近一周</button>
+          <button onClick={() => setTimeRange('month')} className={`px-4 py-2 text-sm font-medium rounded ${timeRange === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>最近一月</button>
+          <button onClick={() => setTimeRange('custom')} className={`px-4 py-2 text-sm font-medium rounded ${timeRange === 'custom' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>自定义日期</button>
+          
+          {timeRange === 'custom' && (
+            <div className="flex space-x-2 items-center ml-4">
+              <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              <span className="text-gray-500">-</span>
+              <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+            </div>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8 text-gray-500">加载中...</div>
+        ) : (
+          <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900/50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">设备 ID (激活码)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">授权类型</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">激活时间</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                {data.map(item => (
+                  <tr key={item.id}>
+                    <td className="px-6 py-4 text-sm font-mono text-gray-900 dark:text-gray-300 break-all">{item.hardwareId}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.licenseType}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.activatedAt ? new Date(item.activatedAt).toLocaleString() : '-'}</td>
+                  </tr>
+                ))}
+                {data.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-6 py-10 text-center text-sm text-gray-500">无数据</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PublicKeyDetail({ apiFetch, setActiveTab }: { apiFetch: (url: string, options?: RequestInit) => Promise<Response>, setActiveTab: (tab: string) => void }) {
+  const [pubKey, setPubKey] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchKey();
+  }, []);
+
+  const fetchKey = async () => {
+    try {
+      const res = await apiFetch('/api/License/public-key/text');
+      if (res.ok) {
+        const data = await res.json();
+        setPubKey(data.publicKey);
+      } else {
+        toast.error('获取公钥失败');
+      }
+    } catch (err) {
+      toast.error('网络错误');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(pubKey);
+    toast.success('公钥已复制到剪贴板');
+  };
+
+  return (
+    <div className="w-full max-w-5xl mx-auto space-y-8">
+      <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              查看 RSA 公钥
+            </h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              用于客户端验证授权的 RSA 签名。
+            </p>
+          </div>
+          <div>
+            <button onClick={() => setActiveTab('dashboard')} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 rounded text-sm font-semibold transition-colors">
+              返回大盘
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8 text-gray-500">加载中...</div>
+        ) : (
+          <div className="space-y-6">
+            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 font-mono text-sm border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all overflow-x-auto">
+              {pubKey}
+            </div>
+            
+            <button
+              onClick={handleCopy}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded shadow transition-colors"
+            >
+              📋 复制公钥
+            </button>
+
+            <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">使用说明</h3>
+              <ul className="list-disc pl-5 space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                <li>点击上方 <strong>复制公钥</strong> 按钮。</li>
+                <li>在您的客户端项目（如 C#、Java、Go 等）中，新建一个文本文件，命名为 <code>public_key.pem</code>。</li>
+                <li>将复制的内容完全粘贴进该文件中，确保包含 <code>-----BEGIN PUBLIC KEY-----</code> 和 <code>-----END PUBLIC KEY-----</code>。</li>
+                <li>在客户端代码中加载该 PEM 文件进行签名验证。</li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -113,6 +432,41 @@ export default function AdminDashboard() {
   const [is2faEnabled, setIs2faEnabled] = useState(false);
   const [passkeys, setPasskeys] = useState<any[]>([]);
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+
+  const fetchRegistrationStatus = async () => {
+    try {
+      const res = await apiFetch(`/api/admin/settings/registration`);
+      if (res.ok) {
+        const data = await res.json();
+        setRegistrationEnabled(data.enabled ?? data.registrationEnabled);
+      }
+    } catch (err) {
+      console.error("Failed to fetch registration status", err);
+    }
+  };
+
+  const handleToggleRegistration = async () => {
+    const newValue = !registrationEnabled;
+    try {
+      setSettingsLoading(true);
+      const res = await apiFetch(`/api/admin/settings/registration`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registrationEnabled: newValue })
+      });
+      if (res.ok) {
+        setRegistrationEnabled(newValue);
+        toast.success(newValue ? '已开启用户注册' : '已关闭用户注册');
+      } else {
+        toast.error('设置失败');
+      }
+    } catch (err) {
+      toast.error('系统错误');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
 
   const fetchSettingsStatus = async () => {
     if (!currentUser?.userId) return;
@@ -134,6 +488,7 @@ export default function AdminDashboard() {
     if (activeTab === 'settings' && currentUser) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchSettingsStatus();
+      fetchRegistrationStatus();
     }
   }, [activeTab, currentUser]);
 
@@ -495,13 +850,12 @@ export default function AdminDashboard() {
                     实时掌控授权发放、激活趋势与防爆破拦截情况。
                   </p>
                 </div>
-                <a 
-                  href="/api/License/public-key" 
-                  target="_blank" 
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded shadow transition-colors"
+                <button 
+                  onClick={() => setActiveTab('public_key_detail')}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded shadow transition-colors inline-block"
                 >
-                  ⬇️ 下载 RSA 公钥 (客户端用)
-                </a>
+                  👀 查看 RSA 公钥 (客户端用)
+                </button>
               </div>
 
               {!statsLoading && stats ? (
@@ -515,12 +869,24 @@ export default function AdminDashboard() {
                       <div className="text-sm text-red-600 dark:text-red-400">今日风控拦截攻击</div>
                       <div className="text-3xl font-bold text-red-900 dark:text-red-100 mt-2">{stats.todayBlocks}</div>
                     </div>
-                    <div className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800">
-                      <div className="text-sm text-green-600 dark:text-green-400">总发卡授权存量</div>
+                    <div 
+                      className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
+                      onClick={() => setActiveTab('licenses_detail')}
+                    >
+                      <div className="text-sm text-green-600 dark:text-green-400 flex items-center justify-between">
+                        总发卡授权存量
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                      </div>
                       <div className="text-3xl font-bold text-green-900 dark:text-green-100 mt-2">{stats.totalActiveLicenses}</div>
                     </div>
-                    <div className="p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800">
-                      <div className="text-sm text-purple-600 dark:text-purple-400">系统总激活设备</div>
+                    <div 
+                      className="p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+                      onClick={() => setActiveTab('devices_detail')}
+                    >
+                      <div className="text-sm text-purple-600 dark:text-purple-400 flex items-center justify-between">
+                        系统总激活设备
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                      </div>
                       <div className="text-3xl font-bold text-purple-900 dark:text-purple-100 mt-2">{stats.totalDevices}</div>
                     </div>
                   </div>
@@ -757,12 +1123,48 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {activeTab === 'licenses_detail' && (
+          <LicenseDetailTable apiFetch={apiFetch} setActiveTab={setActiveTab} />
+        )}
+
+        {activeTab === 'devices_detail' && (
+          <DeviceDetailTable apiFetch={apiFetch} setActiveTab={setActiveTab} />
+        )}
+
+        {activeTab === 'public_key_detail' && (
+          <PublicKeyDetail apiFetch={apiFetch} setActiveTab={setActiveTab} />
+        )}
+
         {activeTab === 'settings' && (
           <div className="w-full max-w-5xl mx-auto space-y-8">
             <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10">
               <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">安全与账户设置</h2>
               
               <div className="space-y-10">
+                {/* Registration Setting Section */}
+                <div>
+                  <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2 mb-4">系统设置</h3>
+                  <div className="bg-gray-50 dark:bg-gray-700/50 p-6 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900 dark:text-white">用户注册</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">控制是否允许新用户注册账号。关闭后注册页面将无法提交注册。</p>
+                    </div>
+                    <button
+                      onClick={handleToggleRegistration}
+                      disabled={settingsLoading}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:opacity-50 ${registrationEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'}`}
+                      role="switch"
+                      aria-checked={registrationEnabled}
+                    >
+                      <span className="sr-only">Toggle user registration</span>
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${registrationEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
                 {/* 2FA Section */}
                 <div>
                   <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2 mb-4">二次验证 (2FA)</h3>

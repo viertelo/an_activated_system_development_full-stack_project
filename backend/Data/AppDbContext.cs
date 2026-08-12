@@ -20,6 +20,7 @@ namespace backend.Data
         public DbSet<Order> Orders { get; set; }
         public DbSet<WebhookEvent> WebhookEvents { get; set; }
         public DbSet<FidoStoredCredential> FidoStoredCredentials { get; set; }
+        public DbSet<SystemSetting> SystemSettings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -36,6 +36,12 @@ namespace backend.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
+            var regSetting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.Key == "RegistrationEnabled");
+            if (regSetting != null && regSetting.Value == "false")
+            {
+                return BadRequest(new { Message = "当前系统已关闭用户注册功能" });
+            }
+
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
             {
                 return BadRequest(new { Message = "该邮箱已被注册" });
@@ -152,6 +158,11 @@ namespace backend.Controllers
                 });
                 await _context.SaveChangesAsync();
                 return Unauthorized(new { Message = "必须确认邮箱后才能开通账户并登录。" });
+            }
+
+            if (!user.IsTwoFactorEnabled && !string.IsNullOrEmpty(dto.TwoFactorCode))
+            {
+                return Unauthorized(new { Message = "您的账号未开启二次验证，无需填写动态验证码，请留空后重试。" });
             }
 
             // 如果用户开启了 2FA，必须校验二步验证码

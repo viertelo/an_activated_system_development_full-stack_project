@@ -1,4 +1,6 @@
 using System.Threading.Tasks;
+using System.IO;
+using System.IO.Compression;
 using backend.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -81,7 +83,28 @@ namespace backend.Controllers
         public IActionResult GetPublicKey()
         {
             var pubKey = _rsaKeyService.GetPublicKeyPem();
-            return Content(pubKey, "text/plain");
+            var bytes = System.Text.Encoding.UTF8.GetBytes(pubKey);
+            
+            using var memoryStream = new MemoryStream();
+            using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
+            {
+                var zipEntry = archive.CreateEntry("public_key.pem");
+                using var entryStream = zipEntry.Open();
+                entryStream.Write(bytes, 0, bytes.Length);
+            }
+            
+            memoryStream.Position = 0;
+            return File(memoryStream.ToArray(), "application/zip", "public_key.zip");
+        }
+
+        /// <summary>
+        /// 供后台直接查看公钥文本
+        /// </summary>
+        [HttpGet("public-key/text")]
+        public IActionResult GetPublicKeyText()
+        {
+            var pubKey = _rsaKeyService.GetPublicKeyPem();
+            return Ok(new { PublicKey = pubKey });
         }
     }
 

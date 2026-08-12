@@ -7,7 +7,8 @@ using backend.Filters;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
+using Microsoft.AspNetCore.Authorization;
+using backend.Models;
 namespace backend.Controllers
 {
     [ApiController]
@@ -133,6 +134,103 @@ namespace backend.Controllers
             if (success) return Ok(new { Message = "吊销成功，相关审计日志已记录。" });
             return NotFound(new { Message = "未找到该 License。" });
         }
+
+        [HttpGet("licenses/detail")]
+        public async Task<IActionResult> GetLicenseDetails([FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+        {
+            var query = _context.Licenses.AsQueryable();
+
+            if (startDate.HasValue)
+                query = query.Where(l => l.CreatedAt >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(l => l.CreatedAt <= endDate.Value);
+
+            var licenses = await query
+                .Include(l => l.Devices)
+                .AsNoTracking()
+                .OrderByDescending(l => l.CreatedAt)
+                .Take(500)
+                .Select(l => new {
+                    l.Id,
+                    l.MaxDevices,
+                    l.UserId,
+                    l.AllowDeviceTransfer,
+                    l.MaxActivations,
+                    l.CurrentActivationCount,
+                    l.IsActive,
+                    l.LicenseType,
+                    l.ExpirationDate,
+                    l.CreatedAt,
+                    ActivatedDevices = l.Devices != null ? l.Devices.Select(d => d.HardwareId).ToList() : new System.Collections.Generic.List<string>()
+                })
+                .ToListAsync();
+
+            return Ok(licenses);
+        }
+
+        [HttpGet("devices/detail")]
+        public async Task<IActionResult> GetDeviceDetails([FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+        {
+            var query = _context.Devices.AsQueryable();
+
+            if (startDate.HasValue)
+                query = query.Where(d => d.ActivatedAt >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(d => d.ActivatedAt <= endDate.Value);
+
+            var devices = await query
+                .Include(d => d.License)
+                .AsNoTracking()
+                .OrderByDescending(d => d.ActivatedAt)
+                .Take(500)
+                .Select(d => new {
+                    d.Id,
+                    d.HardwareId,
+                    d.LicenseId,
+                    d.ActivatedAt,
+                    LicenseType = d.License != null ? d.License.LicenseType : "Unknown",
+                    LicenseMaxDevices = d.License != null ? d.License.MaxDevices : 0
+                })
+                .ToListAsync();
+
+            return Ok(devices);
+        }
+
+        [HttpGet("settings/registration")]
+        [AllowAnonymous] // 允许非认证用户查询注册状态
+        public async Task<IActionResult> GetRegistrationSetting()
+        {
+            var setting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.Key == "RegistrationEnabled");
+            // 默认开启
+            bool isEnabled = setting == null || setting.Value == "true";
+            return Ok(new { RegistrationEnabled = isEnabled });
+        }
+
+        public class RegistrationSettingRequest
+        {
+            public bool RegistrationEnabled { get; set; }
+        }
+
+        [HttpPost("settings/registration")]
+        public async Task<IActionResult> SetRegistrationSetting([FromBody] RegistrationSettingRequest request)
+        {
+            var setting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.Key == "RegistrationEnabled");
+            if (setting == null)
+            {
+                setting = new SystemSetting { Key = "RegistrationEnabled", Value = request.RegistrationEnabled ? "true" : "false" };
+                _context.SystemSettings.Add(setting);
+            }
+            else
+            {
+                setting.Value = request.RegistrationEnabled ? "true" : "false";
+            }
+            
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "注册设置已更新", RegistrationEnabled = request.RegistrationEnabled });
+        }
+        
         [HttpGet("users")]
         public async Task<IActionResult> GetUsers()
         {

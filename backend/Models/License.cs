@@ -21,6 +21,8 @@ namespace backend.Models
         public Guid UserId { get; set; }
         public User? User { get; set; }
 
+        public ICollection<Device>? Devices { get; set; }
+
         /// <summary>
         /// 是否允许设备换绑。若允许，当达到最大设备数时，新设备激活将自动解绑最旧的设备。
         /// </summary>
@@ -47,8 +49,11 @@ namespace backend.Models
         public string LicenseType { get; set; } = "Permanent";
 
         /// <summary>
-        /// 过期时间 (若为永久则可为 null)
-        /// </summary>
         public DateTime? ExpirationDate { get; set; }
+
+        /// <summary>
+        /// 创建时间
+        /// </summary>
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

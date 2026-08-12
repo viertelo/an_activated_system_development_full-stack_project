@@ -2,29 +2,54 @@
 
 import { useState, useEffect } from 'react';
 import {
-  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
+
+interface GenerateResult {
+  message?: string;
+  licenseKeys?: string[];
+}
+
+interface ChartData {
+  date: string;
+  activations: number;
+  blocks: number;
+}
+
+interface StatsData {
+  todayActivations: number;
+  todayBlocks: number;
+  totalActiveLicenses: number;
+  totalDevices: number;
+  chartData: ChartData[];
+}
+
+interface UserData {
+  id: string;
+  email: string;
+  role: string;
+  isEmailVerified: boolean;
+  createdAt: string;
+}
 
 export default function AdminDashboard() {
-  const router = typeof window !== 'undefined' ? require('next/navigation').useRouter() : null;
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<{ userId: string, role: string } | null>(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentUser(JSON.parse(userStr));
     }
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
-    if (router) {
-      router.push('/');
-    } else {
-      window.location.href = '/';
-    }
+    router.push('/');
   };
 
   const [userId, setUserId] = useState('');
@@ -33,26 +58,16 @@ export default function AdminDashboard() {
   const [licenseType, setLicenseType] = useState('Permanent');
   const [expirationDate, setExpirationDate] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<GenerateResult | null>(null);
   const [error, setError] = useState('');
 
   // 统计大盘数据
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<StatsData | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
   // 用户数据
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserData[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'users') {
-      fetchUsers();
-    }
-  }, [activeTab]);
 
   const fetchStats = async () => {
     try {
@@ -83,6 +98,18 @@ export default function AdminDashboard() {
       setUsersLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchStats();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchUsers();
+    }
+  }, [activeTab]);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,8 +144,8 @@ export default function AdminDashboard() {
       }
 
       setResult(data);
-    } catch (err: any) {
-      setError(err.message || '系统错误');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '系统错误');
     } finally {
       setLoading(false);
     }
@@ -155,7 +182,7 @@ export default function AdminDashboard() {
       } else {
         toast.error('更新角色失败');
       }
-    } catch (err) {
+    } catch {
       toast.error('系统错误');
     }
   };
@@ -171,7 +198,7 @@ export default function AdminDashboard() {
       } else {
         toast.error('删除失败');
       }
-    } catch (err) {
+    } catch {
       toast.error('系统错误');
     }
   };

@@ -8,13 +8,11 @@ function ResetContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
   
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('正在吊销旧激活码并为您生成全新激活码，请稍候...');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>(!token ? 'error' : 'loading');
+  const [message, setMessage] = useState(!token ? '无效的访问：缺少安全 Token。' : '正在吊销旧激活码并为您生成全新激活码，请稍候...');
 
   useEffect(() => {
     if (!token) {
-      setStatus('error');
-      setMessage('无效的访问：缺少安全 Token。');
       return;
     }
 
@@ -32,9 +30,9 @@ function ResetContent() {
         
         setStatus('success');
         setMessage(text || '激活码已重置换新！新的明文激活码已发送到您的邮箱，请查收。');
-      } catch (err: any) {
+      } catch (err: unknown) {
         setStatus('error');
-        setMessage(err.message || '系统内部错误，请稍后重试。');
+        setMessage(err instanceof Error ? err.message : '系统内部错误，请稍后重试。');
       }
     };
 

@@ -48,9 +48,9 @@ export default function LoginPage() {
       }
       router.push('/admin');
       
-    } catch (err: any) {
-      toast.error(err.message || '系统内部错误，请稍后重试。');
-      setError(err.message || '系统内部错误，请稍后重试。');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : '系统内部错误，请稍后重试。');
+      setError(err instanceof Error ? err.message : '系统内部错误，请稍后重试。');
     } finally {
       setLoading(false);
     }

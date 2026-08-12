@@ -55,7 +55,7 @@ namespace backend.Services
             {
                 // 连接并认证
                 await client.ConnectAsync(host, port, SecureSocketOptions.Auto);
-                await client.AuthenticateAsync(user, pass);
+                await client.AuthenticateAsync(user, pass ?? "");
                 await client.SendAsync(message);
             }
             catch (Exception ex)

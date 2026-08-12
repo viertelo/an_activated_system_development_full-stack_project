@@ -64,9 +64,9 @@ function ResetPasswordContent() {
       
       setStatus('success');
       setMessage(data.message || '密码已成功重置，您可以使新密码登录了。');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatus('error');
-      setMessage(err.message || '系统内部错误，请稍后重试。');
+      setMessage(err instanceof Error ? err.message : '系统内部错误，请稍后重试。');
     }
   };
 

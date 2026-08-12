@@ -35,8 +35,8 @@ export default function ForgotPasswordPage() {
 
       setSuccessMsg(data.message || '找回密码的邮件已发送，请检查您的收件箱。');
       setEmail('');
-    } catch (err: any) {
-      setError(err.message || '系统内部错误，请稍后重试。');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '系统内部错误，请稍后重试。');
     } finally {
       setLoading(false);
     }

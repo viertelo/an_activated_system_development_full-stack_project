@@ -35,8 +35,8 @@ export default function ForgotLicensePage() {
 
       setSuccessMsg(data.message || '如果您的邮箱存在，重置链接已发送到您的邮箱。');
       setEmail('');
-    } catch (err: any) {
-      setError(err.message || '系统内部错误，请稍后重试。');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '系统内部错误，请稍后重试。');
     } finally {
       setLoading(false);
     }

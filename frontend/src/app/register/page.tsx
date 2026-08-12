@@ -47,8 +47,8 @@ export default function RegisterPage() {
       setEmail('');
       setPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setError(err.message || '系统内部错误，请稍后重试。');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '系统内部错误，请稍后重试。');
     } finally {
       setLoading(false);
     }

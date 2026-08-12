@@ -25,6 +25,7 @@ namespace backend.Controllers
         }
 
         private string FormatOptionsSessionKey(Guid userId) => $"fido2_options_{userId}";
+        private string FormatOptionsSessionKey(string email) => $"fido2_options_{email}";
 
         // --- Registration ---
 

@@ -50,20 +50,8 @@ namespace backend.Services
                 return (false, null);
             }
 
-            if (license.User?.Email != email)
-            {
-                // 邮箱与激活码所属人不匹配
-                _context.AuditLogs.Add(new AuditLog
-                {
-                    Action = "DeviceActivate",
-                    Operator = hardwareId,
-                    Target = $"LicenseId:{license.Id}",
-                    IsSuccess = false,
-                    Details = "尝试使用的激活码与邮箱不匹配"
-                });
-                await _context.SaveChangesAsync();
-                return (false, null);
-            }
+            // 邮箱验证已移除：允许最终用户在电商购买后直接使用激活码激活，无需提供经销商的邮箱
+
 
             if (license.ExpirationDate.HasValue && license.ExpirationDate.Value < DateTime.UtcNow)
             {

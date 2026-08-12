@@ -898,14 +898,33 @@ export default function AdminDashboard() {
                     防爆破与限流机制 (Rate Limit)
                   </h3>
                   <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-8 border-l-2 border-gray-100 dark:border-gray-700 ml-2">
+                    <p>管理员账户登录以及 API 激活接口均启用了严格的 <strong>频率限制 (Rate Limiting)</strong> 和 <strong>并发锁定</strong> 机制。当同一 IP 尝试恶意爆破激活码时，系统会在多次失败后主动拉黑并锁定该 IP 一段时间，大幅提升系统安全性。</p>
                     <p>激活端点极易受到黑客针对性的暴力破解（尝试枚举不同的 License Key）。本系统在 <code>LicenseController.cs</code> 层启用了 <strong>Rate Limiting</strong> 策略。</p>
                     <p>建议在生产环境中进一步结合 WAF（Web Application Firewall）及 Nginx 的 IP 频率限制，确保系统的绝对安全。一旦发现有恶意 IP 高频试错，应通过 WAF 直接将其封禁。</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center">
+                    <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-yellow-900 dark:text-yellow-300">4</span>
+                    如何给客户批量发卡授权？(操作指南)
+                  </h3>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-3 pl-8 border-l-2 border-gray-100 dark:border-gray-700 ml-2">
+                    <p>如果您需要为某个企业客户或代理商批量生成激活码，请遵循以下流程：</p>
+                    <ol className="list-decimal pl-5 space-y-2 text-gray-700 dark:text-gray-300 font-medium">
+                      <li>在左侧导航栏进入 <strong>【注册人员管理】</strong>，找到您的目标客户账号（必须让客户先在系统内注册账号）。</li>
+                      <li>点击该客户操作栏中的 <span className="text-blue-600 dark:text-blue-400">“生成发卡”</span> 按钮，系统会自动跳回【大盘与发卡】页面，并帮您填好该客户的唯一标识符 (UserId)。</li>
+                      <li>向下滚动找到 <strong>【批量生成激活码】</strong> 面板。</li>
+                      <li>根据该客户采购的权益，选择 <strong>授权类型</strong>（永久版/订阅版/试用版）。如果不是永久版，请务必设定准确的 <strong>过期时间</strong>。</li>
+                      <li>填写 <strong>发卡数量</strong>（例如 100 张）以及每张卡允许激活的 <strong>最大设备数</strong>（默认为 1）。</li>
+                      <li>点击【生成激活码】按钮。生成成功后，点击下方出现的 <strong>【导出为 CSV】</strong>，即可将 100 个激活码直接打包发给客户！</li>
+                    </ol>
                   </div>
                 </div>
                 
                 <div>
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center">
-                    <span className="bg-purple-100 text-purple-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-purple-900 dark:text-purple-300">4</span>
+                    <span className="bg-purple-100 text-purple-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-purple-900 dark:text-purple-300">5</span>
                     Passkey 通行密钥与账号安全
                   </h3>
                   <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-8 border-l-2 border-gray-100 dark:border-gray-700 ml-2">

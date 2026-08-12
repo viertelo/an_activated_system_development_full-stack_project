@@ -182,10 +182,6 @@ export default function LoginPage() {
                   <Link href="/forgot-password" className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400">
                     忘记密码
                   </Link>
-                  <span className="text-gray-300 dark:text-gray-600">|</span>
-                  <Link href="/forgot-license" className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400">
-                    忘记激活码
-                  </Link>
                 </div>
               </div>
               <div className="mt-1">

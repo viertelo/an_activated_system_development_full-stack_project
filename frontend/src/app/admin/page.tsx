@@ -213,8 +213,8 @@ export default function AdminDashboard() {
     try {
       setSettingsLoading(true);
       // 1. Get options from server
-      const email = currentUser.userId; // in this app userId in localstorage is actually the email
-      const resp = await apiFetch(`/api/passkey/makeCredentialOptions?email=${encodeURIComponent(email)}`, { method: 'POST' });
+      const userId = currentUser.userId; // The guid
+      const resp = await apiFetch(`/api/passkey/makeCredentialOptions?userId=${encodeURIComponent(userId)}`, { method: 'POST' });
       if (!resp.ok) throw new Error('Failed to get registration options');
       const options = await resp.json();
 
@@ -222,7 +222,7 @@ export default function AdminDashboard() {
       const attResp = await startRegistration(options);
 
       // 3. Send response back to server
-      const verifyResp = await apiFetch(`/api/passkey/makeCredential?email=${encodeURIComponent(email)}`, {
+      const verifyResp = await apiFetch(`/api/passkey/makeCredential?userId=${encodeURIComponent(userId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(attResp),

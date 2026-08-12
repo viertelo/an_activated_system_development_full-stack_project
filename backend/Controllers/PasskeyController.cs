@@ -24,14 +24,14 @@ namespace backend.Controllers
             _context = context;
         }
 
-        private string FormatOptionsSessionKey(string email) => $"fido2_options_{email}";
+        private string FormatOptionsSessionKey(Guid userId) => $"fido2_options_{userId}";
 
         // --- Registration ---
 
         [HttpPost("makeCredentialOptions")]
-        public async Task<IActionResult> MakeCredentialOptions([FromQuery] string email)
+        public async Task<IActionResult> MakeCredentialOptions([FromQuery] Guid userId)
         {
-            var user = await _context.Users.AsNoTracking().Include(u => u.FidoStoredCredentials).FirstOrDefaultAsync(u => u.Email == email);
+            var user = await _context.Users.AsNoTracking().Include(u => u.FidoStoredCredentials).FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null) return NotFound("User not found");
 
             var fidoUser = new Fido2User
@@ -59,18 +59,18 @@ namespace backend.Controllers
                 AttestationPreference = AttestationConveyancePreference.None
             });
 
-            HttpContext.Session.SetString(FormatOptionsSessionKey(email), options.ToJson());
+            HttpContext.Session.SetString(FormatOptionsSessionKey(userId), options.ToJson());
 
             return Ok(options);
         }
 
         [HttpPost("makeCredential")]
-        public async Task<IActionResult> MakeCredential([FromBody] AuthenticatorAttestationRawResponse attestationResponse, [FromQuery] string email)
+        public async Task<IActionResult> MakeCredential([FromBody] AuthenticatorAttestationRawResponse attestationResponse, [FromQuery] Guid userId)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null) return NotFound("User not found");
 
-            var jsonOptions = HttpContext.Session.GetString(FormatOptionsSessionKey(email));
+            var jsonOptions = HttpContext.Session.GetString(FormatOptionsSessionKey(userId));
             if (string.IsNullOrEmpty(jsonOptions))
             {
                 return BadRequest("Invalid session or session expired.");
@@ -111,7 +111,7 @@ namespace backend.Controllers
             await _context.SaveChangesAsync();
 
             // Clear session
-            HttpContext.Session.Remove(FormatOptionsSessionKey(email));
+            HttpContext.Session.Remove(FormatOptionsSessionKey(userId));
 
             return Ok(new { Status = "ok", ErrorMessage = "" });
         }

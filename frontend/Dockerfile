@@ -2,7 +2,7 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
 # Next.js 配置为输出纯静态 HTML (已在 next.config.ts 中配置 output: 'export')
 RUN npm run build

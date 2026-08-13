@@ -109,11 +109,13 @@ builder.Services.AddHostedService<LicenseBackgroundWorker>();
 
 var app = builder.Build();
 
+// 提前实例化 RsaKeyService，以便在系统启动时立即生成或加载 RSA 密钥文件
+app.Services.GetRequiredService<RsaKeyService>();
+
 // 自动在应用启动时创建数据库表结构 (适用于开发环境及首次 Docker 部署)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    // db.Database.EnsureCreated();
     db.Database.Migrate();
 
     // 自动根据环境变量创建初始管理员
@@ -144,7 +146,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
-app.UseHttpsRedirection();
 
 // 启用跨域和限流中间件
 app.UseCors("AllowFrontend");

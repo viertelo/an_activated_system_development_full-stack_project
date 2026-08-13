@@ -32,7 +32,7 @@ function Reset2FAContent() {
     setMessage('');
     
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/2fa/reset`, {
+      const res = await fetch(`/api/auth/2fa/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),

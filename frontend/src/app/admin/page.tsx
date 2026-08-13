@@ -45,6 +45,11 @@ function LicenseDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string
   const [customEnd, setCustomEnd] = useState('');
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  const totalPages = Math.ceil(data.length / itemsPerPage);
+  const paginatedData = data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   useEffect(() => {
     fetchData();
@@ -52,6 +57,7 @@ function LicenseDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string
 
   const fetchData = async () => {
     setLoading(true);
+    setCurrentPage(1);
     try {
       let url = '/api/admin/licenses/detail';
       if (timeRange !== 'all') {
@@ -131,7 +137,7 @@ function LicenseDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                {data.map(item => (
+                {paginatedData.map(item => (
                   <tr key={item.id}>
                     <td className="px-6 py-4 text-sm font-mono text-gray-900 dark:text-gray-300">
                       {item.activatedDevices && item.activatedDevices.length > 0 ? (
@@ -163,6 +169,28 @@ function LicenseDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string
             </table>
           </div>
         )}
+
+        {totalPages > 1 && (
+          <div className="flex justify-center space-x-2 mt-4 items-center text-gray-700 dark:text-gray-300">
+            <button 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors text-sm"
+            >
+              上一页
+            </button>
+            <span className="text-sm">
+              第 {currentPage} 页，共 {totalPages} 页
+            </span>
+            <button 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors text-sm"
+            >
+              下一页
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -174,6 +202,11 @@ function DeviceDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string,
   const [customEnd, setCustomEnd] = useState('');
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  const totalPages = Math.ceil(data.length / itemsPerPage);
+  const paginatedData = data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   useEffect(() => {
     fetchData();
@@ -181,6 +214,7 @@ function DeviceDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string,
 
   const fetchData = async () => {
     setLoading(true);
+    setCurrentPage(1);
     try {
       let url = '/api/admin/devices/detail';
       if (timeRange !== 'all') {
@@ -258,7 +292,7 @@ function DeviceDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string,
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                {data.map(item => (
+                {paginatedData.map(item => (
                   <tr key={item.id}>
                     <td className="px-6 py-4 text-sm font-mono text-gray-900 dark:text-gray-300 break-all">{item.hardwareId}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.licenseType}</td>
@@ -272,6 +306,28 @@ function DeviceDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string,
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex justify-center space-x-2 mt-4 items-center text-gray-700 dark:text-gray-300">
+            <button 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors text-sm"
+            >
+              上一页
+            </button>
+            <span className="text-sm">
+              第 {currentPage} 页，共 {totalPages} 页
+            </span>
+            <button 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors text-sm"
+            >
+              下一页
+            </button>
           </div>
         )}
       </div>
@@ -304,8 +360,37 @@ function PublicKeyDetail({ apiFetch, setActiveTab }: { apiFetch: (url: string, o
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(pubKey);
-    toast.success('公钥已复制到剪贴板');
+    const successToast = () => toast.success('公钥已复制到剪贴板', {
+      style: { background: '#10B981', color: '#fff' }
+    });
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(pubKey)
+        .then(successToast)
+        .catch(() => toast.error('复制失败'));
+    } else {
+      // 非 HTTPS 局域网环境降级方案
+      const textArea = document.createElement("textarea");
+      textArea.value = pubKey;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      textArea.style.top = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          successToast();
+        } else {
+          toast.error('复制失败，请手动选择文字复制');
+        }
+      } catch (err) {
+        toast.error('浏览器不支持自动复制，请手动复制');
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   return (

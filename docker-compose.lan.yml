@@ -1,25 +1,6 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:${POSTGRES_VERSION:-15-alpine}
-    container_name: activation_db_lan
-    environment:
-      POSTGRES_USER: ${DB_USER:-activate_admin}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-YourSuperSecretPassword}
-      POSTGRES_DB: ${DB_NAME:-activation_db}
-    volumes:
-      - ./data/db:/var/lib/postgresql/data
-    networks:
-      - activation_net_lan
-    restart: on-failure:5
-    security_opt:
-      - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 1G
 
   backend:
     build:
@@ -35,17 +16,13 @@ services:
       SMTP_PORT: ${SMTP_PORT:-465}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASS: ${SMTP_PASS}
+      fido2__serverDomain: ${FIDO2_SERVER_DOMAIN:-localhost}
+      fido2__origin: ${FIDO2_ORIGIN:-http://localhost}
     volumes:
       - ./data/keys:/app/Keys
-    depends_on:
-      - db
     networks:
       - activation_net_lan
     restart: on-failure:5
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     deploy:
       resources:
         limits:

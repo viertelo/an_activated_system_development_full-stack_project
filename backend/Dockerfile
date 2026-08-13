@@ -24,7 +24,8 @@ ENV ASPNETCORE_URLS=http://+:5000
 # 创建 Keys 目录
 RUN mkdir -p /app/Keys && chmod 700 /app/Keys
 
-# 运行为 root 用户（注释掉 USER $APP_UID），解决宿主机挂载目录无写入权限的问题
+# 运行为 root 用户，解决宿主机挂载目录无写入权限的问题
+USER root
 # USER $APP_UID
 
 ENTRYPOINT ["dotnet", "backend.dll"]

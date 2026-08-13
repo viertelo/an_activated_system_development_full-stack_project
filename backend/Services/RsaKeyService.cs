@@ -36,7 +36,7 @@ namespace backend.Services
             else
             {
                 // Generate new keys (2048-bit)
-                _rsa.KeySize = 2048;
+                _rsa = RSA.Create(2048);
                 
                 var privateKeyPem = _rsa.ExportRSAPrivateKeyPem();
                 var publicKeyPem = _rsa.ExportRSAPublicKeyPem();

@@ -75,7 +75,13 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        data = { message: text || '发送失败，服务器异常，请稍后重试。' };
+      }
       if (res.ok) {
         toast.success(data.message || '重置链接已发送到该邮箱。');
       } else {

@@ -70,7 +70,8 @@ namespace backend.Controllers
             await _context.SaveChangesAsync();
 
             // 发送确认邮件
-            var verifyLink = $"http://{Request.Host}/api/auth/verify-email?token={token}";
+            var scheme = Request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? Request.Scheme;
+            var verifyLink = $"{scheme}://{Request.Host}/api/auth/verify-email?token={token}";
             try
             {
                 await _emailService.SendEmailAsync(user.Email, "请验证您的注册邮箱", htmlBody);
@@ -341,7 +342,8 @@ namespace backend.Controllers
 
             await _context.SaveChangesAsync();
 
-            var resetLink = $"http://{Request.Host}/api/auth/reset-password?token={token}";
+            var scheme = Request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? Request.Scheme;
+            var resetLink = $"{scheme}://{Request.Host}/reset-password?token={token}";
             var htmlBody = $"<h3>账户密码重置</h3><p>系统收到了您的密码重置请求。</p><p>请点击下方链接重置您的密码（链接在1小时内有效）：</p><p><a href='{resetLink}'>点击重置密码</a></p><p>如果这不是您的操作，请忽略此邮件，您的账户是安全的。</p>";
             
             try
@@ -428,7 +430,8 @@ namespace backend.Controllers
 
             await _context.SaveChangesAsync();
 
-            var resetLink = $"http://{Request.Host}/reset-2fa?token={token}";
+            var scheme = Request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? Request.Scheme;
+            var resetLink = $"{scheme}://{Request.Host}/reset-2fa?token={token}";
             var htmlBody = $"<h3>关闭二次验证申请</h3><p>系统收到了您关闭二次验证(2FA)的请求。</p><p>请点击下方链接强制关闭您的 2FA（链接在1小时内有效）：</p><p><a href='{resetLink}'>点击关闭二次验证</a></p><p>如果这不是您的操作，请忽略此邮件，您的账户是安全的。</p>";
             
             try

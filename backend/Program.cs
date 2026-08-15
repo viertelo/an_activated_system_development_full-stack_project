@@ -149,6 +149,22 @@ using (var scope = app.Services.CreateScope())
 
 // 启用跨域和限流中间件
 app.UseCors("AllowFrontend");
+
+// 全局异常处理，确保所有未捕获异常都返回 JSON
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        
+        var exceptionHandlerPathFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
+        var errorMessage = exceptionHandlerPathFeature?.Error?.Message ?? "服务器内部异常，请稍后重试。";
+        
+        await context.Response.WriteAsJsonAsync(new { Message = "系统内部错误: " + errorMessage });
+    });
+});
+
 app.UseRateLimiter();
 
 app.UseSession(); // 启用 Session 必须在 UseCors 之后，UseAuthorization 之前

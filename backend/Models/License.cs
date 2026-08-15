@@ -18,7 +18,7 @@ namespace backend.Models
         /// </summary>
         public int MaxDevices { get; set; } = 1;
         
-        public Guid UserId { get; set; }
+        public Guid? UserId { get; set; }
         public User? User { get; set; }
 
         public ICollection<Device>? Devices { get; set; }

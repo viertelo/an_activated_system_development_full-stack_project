@@ -69,14 +69,14 @@ namespace backend.Controllers
 
             await _context.SaveChangesAsync();
 
-            // 发送确认邮件
             var scheme = Request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? Request.Scheme;
             var verifyLink = $"{scheme}://{Request.Host}/api/auth/verify-email?token={token}";
+            var htmlBody = $"<h3>欢迎注册激活系统</h3><p>请点击下方链接确认您的邮箱以开通账户：</p><p><a href='{verifyLink}'>验证我的邮箱</a></p>";
             try
             {
                 await _emailService.SendEmailAsync(user.Email, "请验证您的注册邮箱", htmlBody);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, new { Message = "邮件发送失败，请稍后重试。" });
             }
@@ -350,7 +350,7 @@ namespace backend.Controllers
             {
                 await _emailService.SendEmailAsync(user.Email, "您的密码重置链接", htmlBody);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, new { Message = "邮件发送失败，请稍后重试。" });
             }
@@ -438,7 +438,7 @@ namespace backend.Controllers
             {
                 await _emailService.SendEmailAsync(user.Email, "您的 2FA 重置链接", htmlBody);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, new { Message = "邮件发送失败，请稍后重试。" });
             }

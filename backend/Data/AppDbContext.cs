@@ -35,6 +35,13 @@ namespace backend.Data
             modelBuilder.Entity<WebhookEvent>()
                 .HasIndex(w => w.EventId)
                 .IsUnique();
+
+            // 设置用户删除时，激活码的外键置空，而不是级联删除
+            modelBuilder.Entity<License>()
+                .HasOne(l => l.User)
+                .WithMany()
+                .HasForeignKey(l => l.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

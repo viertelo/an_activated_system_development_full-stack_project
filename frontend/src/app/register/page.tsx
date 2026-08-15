@@ -55,7 +55,13 @@ export default function RegisterPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        data = { message: text || '服务器异常，请稍后重试。' };
+      }
 
       if (!res.ok) {
         throw new Error(data.message || '注册失败，可能邮箱已被使用。');

@@ -71,8 +71,14 @@ namespace backend.Controllers
 
             // 发送确认邮件
             var verifyLink = $"http://{Request.Host}/api/auth/verify-email?token={token}";
-            var htmlBody = $"<h3>欢迎注册激活系统</h3><p>请点击下方链接确认您的邮箱以开通账户：</p><p><a href='{verifyLink}'>验证我的邮箱</a></p>";
-            await _emailService.SendEmailAsync(user.Email, "请验证您的注册邮箱", htmlBody);
+            try
+            {
+                await _emailService.SendEmailAsync(user.Email, "请验证您的注册邮箱", htmlBody);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "邮件发送失败，请稍后重试。" });
+            }
 
             return Ok(new { Message = "注册成功，请前往邮箱点击验证链接开通账户。" });
         }
@@ -338,7 +344,14 @@ namespace backend.Controllers
             var resetLink = $"http://{Request.Host}/api/auth/reset-password?token={token}";
             var htmlBody = $"<h3>账户密码重置</h3><p>系统收到了您的密码重置请求。</p><p>请点击下方链接重置您的密码（链接在1小时内有效）：</p><p><a href='{resetLink}'>点击重置密码</a></p><p>如果这不是您的操作，请忽略此邮件，您的账户是安全的。</p>";
             
-            await _emailService.SendEmailAsync(user.Email, "您的密码重置链接", htmlBody);
+            try
+            {
+                await _emailService.SendEmailAsync(user.Email, "您的密码重置链接", htmlBody);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "邮件发送失败，请稍后重试。" });
+            }
 
             return Ok(new { Message = "如果您的邮箱已注册，密码重置链接已发送到该邮箱。" });
         }
@@ -418,7 +431,14 @@ namespace backend.Controllers
             var resetLink = $"http://{Request.Host}/reset-2fa?token={token}";
             var htmlBody = $"<h3>关闭二次验证申请</h3><p>系统收到了您关闭二次验证(2FA)的请求。</p><p>请点击下方链接强制关闭您的 2FA（链接在1小时内有效）：</p><p><a href='{resetLink}'>点击关闭二次验证</a></p><p>如果这不是您的操作，请忽略此邮件，您的账户是安全的。</p>";
             
-            await _emailService.SendEmailAsync(user.Email, "您的 2FA 重置链接", htmlBody);
+            try
+            {
+                await _emailService.SendEmailAsync(user.Email, "您的 2FA 重置链接", htmlBody);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "邮件发送失败，请稍后重试。" });
+            }
 
             return Ok(new { Message = "如果您的邮箱已注册且已开启二次验证，重置链接已发送到该邮箱。" });
         }

@@ -27,7 +27,13 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        data = { message: text || '服务器异常，请稍后重试。' };
+      }
 
       if (!res.ok) {
         throw new Error(data.message || '请求失败，请稍后重试。');

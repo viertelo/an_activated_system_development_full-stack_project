@@ -1,15 +1,27 @@
-# 🛡️ 商业级激活授权管理系统 (B2B2C Enterprise Activation System)
+<div align="center">
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)
-![.NET](https://img.shields.io/badge/.NET-10.0-512BD4.svg?style=for-the-badge&logo=dotnet)
-![Next.js](https://img.shields.io/badge/Next.js-16_Turbopack-black.svg?style=for-the-badge&logo=next.js)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1.svg?style=for-the-badge&logo=postgresql)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=for-the-badge&logo=docker)
-![Security](https://img.shields.io/badge/Security-Passkey_%7C_RSA_2048-success.svg?style=for-the-badge)
+# 🛡️ 商业级激活授权管理系统 (B2B2C)
 
-欢迎来到 **商业级激活授权管理系统**！本系统专为采用 **B2B2C (渠道发卡/电商分发)** 模式的商业软件设计。
+**专为商业分发打造的超高性能、企业级安全授权解决方案**
 
-在 B2B2C 模式下，系统完美分离了**管理员管理**与**终端客户激活**的业务边界。采用最严密的加密策略与现代化的全栈架构，保护您的软件知识产权，让发卡、授权与设备管理坚如磐石。
+[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](#)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4.svg?style=for-the-badge&logo=dotnet)](#)
+[![Next.js](https://img.shields.io/badge/Next.js-16_Turbopack-black.svg?style=for-the-badge&logo=next.js)](#)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1.svg?style=for-the-badge&logo=postgresql)](#)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=for-the-badge&logo=docker)](#)
+[![Security](https://img.shields.io/badge/Security-Passkey_%7C_RSA_2048-success.svg?style=for-the-badge)](#)
+
+<br/>
+
+[🌍 English](./README.md) • [🇨🇳 中文文档](./README_zh.md)
+
+<br/>
+
+<p align="center">
+  欢迎来到 <b>商业级激活授权管理系统</b>！本系统专为采用 <b>B2B2C (渠道发卡/电商分发)</b> 模式的商业软件设计。在 B2B2C 模式下，系统完美分离了管理员管理与终端客户激活的业务边界。采用最严密的加密策略与现代化的全栈架构，保护您的软件知识产权，让发卡、授权与设备管理坚如磐石。
+</p>
+
+</div>
 
 ---
 
@@ -18,13 +30,13 @@
 > [!TIP]
 > **为发卡网/经销商量身定制**：终端用户在激活时 **无需提供邮箱、无需注册**。仅凭一串激活码与设备指纹即可完成一键绑定。最大化降低 C 端使用门槛！
 
-- **🔄 智能换机与自动踢出 (Auto-Revoke & Device Transfer)**：支持为激活码配置“最大设备数(MaxDevices)”与“最大换机次数(MaxActivations)”。当用户在全新设备上激活时，若设备槽已满且允许换机，系统将**自动踢出最老的设备**。轻松实现限制多开的同时免去人工解绑的烦恼。
-- **🔐 零暴露级密码学安全 (离线 RSA 防篡改)**：数据库仅存储激活码的 SHA256 哈希值。客户端离线校验采用 2048 位 `RSA + SHA256` 数字签名机制，从根本上防止客户端破解者伪造或篡改授权到期时间。
-- **📱 硬件级无密码认证 (Passkey & WebAuthn)**：管理员后台除了支持传统账号密码外，全面支持现代化 **Passkey (通行密钥/指纹/面容)** 登录。将内部管理账户被盗风险降至物理级别的最低点。
-- **🛡️ 账号防爆破与防并发 (Concurrent Login Prevention)**：支持同一超级管理员账号多地登录**自动互踢**，严格保证 Session 唯一性。内置密码试错防爆破系统，连续输入错误 3 次即锁定账号 15 分钟。
-- **📊 高性能数据大盘 (Real-time Analytics)**：内置图形化管理员看板 (`/admin`)，实时双轨呈现 **今日新增激活量** 与 **异常拦截攻击量**。支持一秒生成千张授权码，并**一键导出带完整规范格式的 CSV 报表**，完美对接各大自动发卡平台。
-- **🚀 极致轻量化与全栈性能优化**：前端采用 Next.js 16 (Static Export) 静态构建，无缝适配 Nginx；后端采用极小体积的 .NET Alpine 镜像，底层集成 **IMemoryCache 内存级高速缓存** 及 Entity Framework 无追踪查询优化，应对高并发抢购/大批量激活稳如泰山。
-- **🐳 容器化黑盒防御**：通过 Docker Compose 部署，数据库与后端 API 的端口被完全封锁在虚拟内网中。唯一对外的窗口由 Nginx 严格把守，并强制全链路 HTTPS。
+- 🔄 **智能换机与自动踢出 (Auto-Revoke & Device Transfer)**：支持为激活码配置“最大设备数(MaxDevices)”与“最大换机次数(MaxActivations)”。当用户在全新设备上激活时，若设备槽已满且允许换机，系统将**自动踢出最老的设备**。轻松实现限制多开的同时免去人工解绑的烦恼。
+- 🔐 **零暴露级密码学安全 (离线 RSA 防篡改)**：数据库仅存储激活码的 SHA256 哈希值。客户端离线校验采用 2048 位 `RSA + SHA256` 数字签名机制，从根本上防止客户端破解者伪造或篡改授权到期时间。
+- 📱 **硬件级无密码认证 (Passkey & WebAuthn)**：管理员后台除了支持传统账号密码外，全面支持现代化 **Passkey (通行密钥/指纹/面容)** 登录。将内部管理账户被盗风险降至物理级别的最低点。
+- 🛡️ **账号防爆破与防并发 (Concurrent Login Prevention)**：支持同一超级管理员账号多地登录**自动互踢**，严格保证 Session 唯一性。内置密码试错防爆破系统，连续输入错误 3 次即锁定账号 15 分钟。
+- 📊 **高性能数据大盘 (Real-time Analytics)**：内置图形化管理员看板 (`/admin`)，实时双轨呈现 **今日新增激活量** 与 **异常拦截攻击量**。支持一秒生成千张授权码，并**一键导出带完整规范格式的 CSV 报表**，完美对接各大自动发卡平台。
+- 🚀 **极致轻量化与全栈性能优化**：前端采用 Next.js 16 (Static Export) 静态构建，无缝适配 Nginx；后端采用极小体积的 .NET Alpine 镜像，底层集成 **IMemoryCache 内存级高速缓存** 及 Entity Framework 无追踪查询优化，应对高并发抢购/大批量激活稳如泰山。
+- 🐳 **容器化黑盒防御**：通过 Docker Compose 部署，数据库与后端 API 的端口被完全封锁在虚拟内网中。唯一对外的窗口由 Nginx 严格把守，并强制全链路 HTTPS。
 
 ---
 
@@ -36,11 +48,13 @@
 ├── docs/                   # 📚 核心文档库 (开发指南、架构解析、API 规范)
 │   ├── architecture_and_workflow.md
 │   ├── disaster_recovery_and_backup.md
-│   └── local_network_deployment_guide.md
+│   ├── local_network_deployment_guide.md
+│   └── production_server_deployment_and_security.md
 ├── docker-compose.yml      # 🐳 一键生产部署编排文件 (强制 HTTPS 外网访问)
 ├── docker-compose.lan.yml  # 🏠 局域网无外网部署编排 (HTTP 8080端口，测试环境专用)
 ├── .env.example            # ⚙️ 生产环境配置模板
-└── README.md               # 📖 项目首页说明
+├── README.md               # 📖 项目首页说明 (English)
+└── README_zh.md            # 📖 项目首页说明 (Chinese)
 ```
 
 ---
@@ -50,7 +64,7 @@
 ### 1. 查阅文档
 
 强烈建议您在进行任何操作前，先前往 [`docs/`](./docs) 目录查阅文档。
-👉 首推必读：**[核心架构、工作流与 API 对接指南 (Architecture & Workflow)](./docs/architecture_and_workflow.md)**
+👉 **首推必读**：**[核心架构、工作流与 API 对接指南 (Architecture & Workflow)](./docs/architecture_and_workflow.md)**
 
 ### 2. 部署到服务器 (生产环境)
 
@@ -83,6 +97,7 @@
 ## 🛡️ C 端接入合规建议 (Client Integration Advice)
 
 本系统提供了坚不可摧的服务端签发与校验能力。但为了实现完整的软件商业闭环，**在您的 C 端软件 (桌面应用/插件等) 接入时**，我们强烈建议您加入：
+
 1. **VMP 加壳 / 代码混淆**：防止黑客反编译提取公钥或跳过验证逻辑。
 2. **设备指纹混淆**：采集主板/CPU/网卡 MAC 等多维度信息并哈希化作为 `HardwareId`。
 3. **RSA 签名本地强校验**：使用我们在后台生成的公钥，对服务器返回的 License 内容进行严密的离线签名验证。
@@ -92,4 +107,6 @@
 
 ---
 
-🎉 祝您的商业软件大卖！
+<div align="center">
+  <b>🎉 祝您的商业软件大卖！</b>
+</div>

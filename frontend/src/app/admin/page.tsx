@@ -948,20 +948,22 @@ export default function AdminDashboard() {
                     实时掌控授权发放、激活趋势与防爆破拦截情况。
                   </p>
                 </div>
-                <button 
-                  onClick={() => setActiveTab('public_key_detail')}
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded shadow transition-colors inline-block"
-                >
-                  👀 查看 RSA 公钥 (客户端用)
-                </button>
               </div>
 
               {!statsLoading && stats ? (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
-                      <div className="text-sm text-blue-600 dark:text-blue-400">今日新增激活</div>
-                      <div className="text-3xl font-bold text-blue-900 dark:text-blue-100 mt-2">{stats.todayActivations}</div>
+                    <div 
+                      className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                      onClick={() => setActiveTab('public_key_detail')}
+                    >
+                      <div className="text-sm text-blue-600 dark:text-blue-400 flex items-center justify-between">
+                        系统 RSA 公钥
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                      </div>
+                      <div className="text-xl font-bold text-blue-900 dark:text-blue-100 mt-3 truncate">
+                        点击查看 / 复制
+                      </div>
                     </div>
                     <div 
                       className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"

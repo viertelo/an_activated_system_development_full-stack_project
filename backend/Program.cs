@@ -5,8 +5,17 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Fido2NetLib;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // 如果 Nginx 和后端在同一服务器或 Docker 容器内，清除 KnownNetworks，允许所有代理传递 X-Forwarded-For
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -108,6 +117,8 @@ builder.Services.AddSingleton<RsaKeyService>();
 builder.Services.AddHostedService<LicenseBackgroundWorker>();
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // 提前实例化 RsaKeyService，以便在系统启动时立即生成或加载 RSA 密钥文件
 app.Services.GetRequiredService<RsaKeyService>();

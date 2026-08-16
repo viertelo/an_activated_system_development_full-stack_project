@@ -158,7 +158,8 @@ export default function SecurityLogs({ apiFetch }: SecurityLogsProps) {
               <tr>
                 <th className="px-6 py-4 font-semibold">时间</th>
                 <th className="px-6 py-4 font-semibold">事件类型</th>
-                <th className="px-6 py-4 font-semibold">操作者 / IP</th>
+                <th className="px-6 py-4 font-semibold">操作者</th>
+                <th className="px-6 py-4 font-semibold">IP 地址</th>
                 <th className="px-6 py-4 font-semibold">状态</th>
                 <th className="px-6 py-4 font-semibold w-full">详细信息</th>
               </tr>
@@ -166,47 +167,59 @@ export default function SecurityLogs({ apiFetch }: SecurityLogsProps) {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">加载中...</td>
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">加载中...</td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">未找到相关安全日志记录。</td>
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">未找到相关安全日志记录。</td>
                 </tr>
               ) : (
-                logs.map(log => (
-                  <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
-                      {new Date(log.timestamp).toLocaleString('zh-CN')}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${getActionColor(log.action)}`}>
-                        {getActionLabel(log.action)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900 dark:text-gray-200">{log.operator}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">{log.target}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {log.isSuccess ? (
-                        <span className="flex items-center text-green-600 dark:text-green-400 text-sm font-medium">
-                          <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-                          成功
+                logs.map(log => {
+                  const ipMatch = log.details.match(/\[IP: (.*?)\]/);
+                  const ipAddress = log.action === 'RateLimitBlocked' ? log.operator : (ipMatch ? ipMatch[1] : '-');
+                  const operatorDisplay = log.action === 'RateLimitBlocked' ? '系统风控' : log.operator;
+                  const cleanDetails = log.details.replace(/\[IP: .*?\] /, '');
+                  
+                  return (
+                    <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                      <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
+                        {new Date(log.timestamp).toLocaleString('zh-CN')}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${getActionColor(log.action)}`}>
+                          {getActionLabel(log.action)}
                         </span>
-                      ) : (
-                        <span className="flex items-center text-red-600 dark:text-red-400 text-sm font-medium">
-                          <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                          失败/拦截
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-gray-700 dark:text-gray-300 truncate max-w-xs md:max-w-md lg:max-w-xl" title={log.details}>
-                        {log.details}
-                      </p>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-gray-900 dark:text-gray-200">{operatorDisplay}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{log.target}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-mono text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded inline-block text-gray-700 dark:text-gray-300">
+                          {ipAddress}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {log.isSuccess ? (
+                          <span className="flex items-center text-green-600 dark:text-green-400 text-sm font-medium">
+                            <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                            成功
+                          </span>
+                        ) : (
+                          <span className="flex items-center text-red-600 dark:text-red-400 text-sm font-medium">
+                            <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            失败/拦截
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-gray-700 dark:text-gray-300 truncate max-w-xs md:max-w-md lg:max-w-xl" title={cleanDetails}>
+                          {cleanDetails}
+                        </p>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

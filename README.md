@@ -1,4 +1,6 @@
-# 🛡️ 商业级激活授权管理系统 (B2B2C Enterprise Activation System)
+# 🛡️ Enterprise License Activation System (B2B2C)
+
+> 🇨🇳 [中文文档 (Chinese Version)](./README_zh.md)
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4.svg?style=for-the-badge&logo=dotnet)
@@ -7,89 +9,91 @@
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=for-the-badge&logo=docker)
 ![Security](https://img.shields.io/badge/Security-Passkey_%7C_RSA_2048-success.svg?style=for-the-badge)
 
-欢迎来到 **商业级激活授权管理系统**！本系统专为采用 **B2B2C (渠道发卡/电商分发)** 模式的商业软件设计。
+Welcome to the **Enterprise License Activation System**! This system is specifically designed for commercial software utilizing a **B2B2C (Channel Distribution/E-commerce)** model.
 
-在 B2B2C 模式下，系统完美分离了**管理员管理**与**终端客户激活**的业务边界。采用最严密的加密策略与现代化的全栈架构，保护您的软件知识产权，让发卡、授权与设备管理坚如磐石。
+In the B2B2C model, the system perfectly separates the business boundaries between **Administrator Management** and **End-User Activation**. It employs the most rigorous encryption strategies and a modernized full-stack architecture to protect your software IP, making licensing, authorization, and device management rock-solid.
 
 ---
 
-## ✨ 核心商业特性 (Enterprise Features)
+## ✨ Core Enterprise Features
 
 > [!TIP]
-> **为发卡网/经销商量身定制**：终端用户在激活时 **无需提供邮箱、无需注册**。仅凭一串激活码与设备指纹即可完成一键绑定。最大化降低 C 端使用门槛！
+> **Tailored for License Distributors & Resellers**: End-users **do not need to provide an email or register** during activation. A single license key and a hardware footprint are all that's required for one-click binding. This minimizes the barrier to entry for end consumers!
 
-- **🔄 智能换机与自动踢出 (Auto-Revoke & Device Transfer)**：支持为激活码配置“最大设备数(MaxDevices)”与“最大换机次数(MaxActivations)”。当用户在全新设备上激活时，若设备槽已满且允许换机，系统将**自动踢出最老的设备**。轻松实现限制多开的同时免去人工解绑的烦恼。
-- **🔐 零暴露级密码学安全 (离线 RSA 防篡改)**：数据库仅存储激活码的 SHA256 哈希值。客户端离线校验采用 2048 位 `RSA + SHA256` 数字签名机制，从根本上防止客户端破解者伪造或篡改授权到期时间。
-- **📱 硬件级无密码认证 (Passkey & WebAuthn)**：管理员后台除了支持传统账号密码外，全面支持现代化 **Passkey (通行密钥/指纹/面容)** 登录。将内部管理账户被盗风险降至物理级别的最低点。
-- **🛡️ 账号防爆破与防并发 (Concurrent Login Prevention)**：支持同一超级管理员账号多地登录**自动互踢**，严格保证 Session 唯一性。内置密码试错防爆破系统，连续输入错误 3 次即锁定账号 15 分钟。
-- **📊 高性能数据大盘 (Real-time Analytics)**：内置图形化管理员看板 (`/admin`)，实时双轨呈现 **今日新增激活量** 与 **异常拦截攻击量**。支持一秒生成千张授权码，并**一键导出带完整规范格式的 CSV 报表**，完美对接各大自动发卡平台。
-- **🚀 极致轻量化与全栈性能优化**：前端采用 Next.js 16 (Static Export) 静态构建，无缝适配 Nginx；后端采用极小体积的 .NET Alpine 镜像，底层集成 **IMemoryCache 内存级高速缓存** 及 Entity Framework 无追踪查询优化，应对高并发抢购/大批量激活稳如泰山。
-- **🐳 容器化黑盒防御**：通过 Docker Compose 部署，数据库与后端 API 的端口被完全封锁在虚拟内网中。唯一对外的窗口由 Nginx 严格把守，并强制全链路 HTTPS。
+- **🔄 Auto-Revoke & Device Transfer**: Supports configuring "Max Devices" and "Max Activations (Transfers)" for license keys. When a user activates on a new device, if all device slots are full but transfers are allowed, the system will **automatically revoke the oldest device**. This easily restricts multi-boxing while eliminating the hassle of manual unbinding.
+- **🔐 Zero-Exposure Cryptographic Security (Offline RSA Anti-Tampering)**: The database only stores the SHA256 hash of the license keys. Offline client-side verification uses a 2048-bit `RSA + SHA256` digital signature mechanism, fundamentally preventing crackers from forging or tampering with authorization expiration dates.
+- **📱 Hardware-Level Passwordless Authentication (Passkey & WebAuthn)**: In addition to traditional accounts and passwords, the admin dashboard fully supports modernized **Passkey (Biometrics/FaceID)** logins. This reduces the risk of internal admin account theft to the lowest physical level.
+- **🛡️ Anti-Brute Force & Concurrent Login Prevention**: Supports **auto-kick** for the same super admin account logged in from multiple locations, strictly ensuring session uniqueness. Built-in brute-force prevention locks the account for 15 minutes after 3 consecutive incorrect password attempts.
+- **📊 High-Performance Real-time Analytics Dashboard**: Features a graphical admin dashboard (`/admin`) that tracks **Today's New Activations** and **Intercepted Attack Volumes** in real-time. Supports generating thousands of license keys in a single second, and **one-click exporting of fully formatted CSV reports**, perfectly integrating with major automated license delivery platforms.
+- **🚀 Extreme Lightweight & Full-Stack Performance Optimization**: The frontend uses Next.js 16 (Static Export) for static building, seamlessly adapting to Nginx. The backend uses a tiny .NET Alpine image, integrating **IMemoryCache** for high-speed memory caching and Entity Framework no-tracking query optimizations, remaining stable even during high-concurrency flash sales or mass activations.
+- **🐳 Containerized Black-Box Defense**: Deployed via Docker Compose, the database and backend API ports are completely sealed within a virtual intranet. The only external window is strictly guarded by Nginx, with forced full-chain HTTPS.
 
 ---
 
-## 📂 项目结构 (Repository Structure)
+## 📂 Repository Structure
 
 ```text
-├── backend/                # 🛠️ C# .NET 10 WebAPI 后端 (鉴权、RSA签发、并发锁、设备清洗逻辑)
-├── frontend/               # 💻 Next.js 16 静态前端 (图表大盘、发卡面板、Passkey 等)
-├── docs/                   # 📚 核心文档库 (开发指南、架构解析、API 规范)
+├── backend/                # 🛠️ C# .NET 10 WebAPI Backend (Auth, RSA Issuance, Concurrency Locks, Device Cleaning Logic)
+├── frontend/               # 💻 Next.js 16 Static Frontend (Charts Dashboard, License Generation Panel, Passkey, etc.)
+├── docs/                   # 📚 Core Documentation Library (Dev Guides, Architecture, API Specs)
 │   ├── architecture_and_workflow.md
 │   ├── disaster_recovery_and_backup.md
-│   └── local_network_deployment_guide.md
-├── docker-compose.yml      # 🐳 一键生产部署编排文件 (强制 HTTPS 外网访问)
-├── docker-compose.lan.yml  # 🏠 局域网无外网部署编排 (HTTP 8080端口，测试环境专用)
-├── .env.example            # ⚙️ 生产环境配置模板
-└── README.md               # 📖 项目首页说明
+│   ├── local_network_deployment_guide.md
+│   └── production_server_deployment_and_security.md
+├── docker-compose.yml      # 🐳 One-Click Production Deployment Compose (Forced HTTPS Public Access)
+├── docker-compose.lan.yml  # 🏠 LAN-Only Deployment Compose (HTTP Port 8080, Testing Only)
+├── .env.example            # ⚙️ Production Environment Configuration Template
+├── README.md               # 📖 Project Home Description (English)
+└── README_zh.md            # 📖 Project Home Description (Chinese)
 ```
 
 ---
 
-## 🚀 快速上手 (Quick Start)
+## 🚀 Quick Start
 
-### 1. 查阅文档
+### 1. Read the Documentation
 
-强烈建议您在进行任何操作前，先前往 [`docs/`](./docs) 目录查阅文档。
-👉 首推必读：**[核心架构、工作流与 API 对接指南 (Architecture & Workflow)](./docs/architecture_and_workflow.md)**
+It is highly recommended that you consult the [`docs/`](./docs) directory before performing any operations.
+👉 Highly Recommended First Read: **[Core Architecture, Workflow & API Integration Guide](./docs/architecture_and_workflow.md)**
 
-### 2. 部署到服务器 (生产环境)
+### 2. Deploy to Server (Production Environment)
 
-准备一台安装好 Docker 的 Linux 服务器，只需几步即可启动完整的业务链：
+Prepare a Linux server with Docker installed, and you can launch the complete business chain in just a few steps:
 
-1. 克隆本项目代码。
-2. 复制并配置 `.env` 环境变量文件：`cp .env.example .env` (根据您的环境调整配置)。
-   > **💡 提示**: 首次启动时，系统将通过 `.env` 中的 `ADMIN_EMAIL` 和 `ADMIN_PASSWORD` 自动为您创建超级管理员账号，并发放默认 RSA 密钥对。
-3. **配置 SSL 证书 (必须)**：由于 Next.js 与 Passkey (WebAuthn) 强依赖安全上下文，生产环境必须使用 HTTPS。
-   - **生产环境下，请将正规机构颁发的 `cert.pem` 和 `key.pem` 放入根目录的 `ssl` 文件夹中。**
-   - 若仅用于外网测试，可运行我们为您准备的一键脚本生成自签证书（`bash generate-ssl.sh`），否则 Nginx 将会崩溃。
-4. 执行启动命令：
+1. Clone this repository.
+2. Copy and configure the `.env` environment variables file: `cp .env.example .env` (adjust configuration according to your environment).
+   > **💡 Tip**: Upon first launch, the system will automatically create a super admin account for you using `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `.env`, and issue a default RSA key pair.
+3. **Configure SSL Certificates (Mandatory)**: Since Next.js and Passkey (WebAuthn) strictly rely on secure contexts, the production environment must use HTTPS.
+   - **In production, please place valid `cert.pem` and `key.pem` from recognized authorities into the `ssl` folder in the root directory.**
+   - If only used for public network testing, you can run the one-click script we prepared to generate self-signed certificates (`bash generate-ssl.sh`), otherwise Nginx will crash.
+4. Execute the startup command:
    ```bash
    docker-compose up -d --build
    ```
 
-### 3. 局域网无外网环境专用部署 (LAN-Only Deployment)
+### 3. LAN-Only Testing Deployment (No Public Network)
 
-如果您是在公司内部纯局域网测试，无法配置域名和 HTTPS，我们也为您准备了一套纯 HTTP、无强制加密的**免配置部署方案**（注意：HTTP 下 Passkey 功能不可用）：
+If you are testing entirely within a company LAN and cannot configure domains or HTTPS, we have prepared a pure HTTP, non-encrypted **zero-configuration deployment plan** (Note: Passkey functionality is unavailable over HTTP):
 
-1. 复制环境文件：`cp .env.lan.example .env.lan`
-2. 使用专用配置启动：
+1. Copy the LAN environment file: `cp .env.lan.example .env.lan`
+2. Start using the dedicated configuration:
    ```bash
    docker-compose -f docker-compose.lan.yml --env-file .env.lan up -d --build
    ```
-> 这套配置使用了本地磁盘的直接映射（`data/db` 和 `data/keys`），保证了即使删库也能一比一完美恢复。与外网版本完全物理隔离，绝不会互相干扰。
+> This configuration uses direct local disk mapping (`data/db` and `data/keys`), ensuring that even if the database container is deleted, it can be perfectly restored. It is completely physically isolated from the public network version and will not interfere with it.
 
 ---
 
-## 🛡️ C 端接入合规建议 (Client Integration Advice)
+## 🛡️ Client Integration Compliance Advice
 
-本系统提供了坚不可摧的服务端签发与校验能力。但为了实现完整的软件商业闭环，**在您的 C 端软件 (桌面应用/插件等) 接入时**，我们强烈建议您加入：
-1. **VMP 加壳 / 代码混淆**：防止黑客反编译提取公钥或跳过验证逻辑。
-2. **设备指纹混淆**：采集主板/CPU/网卡 MAC 等多维度信息并哈希化作为 `HardwareId`。
-3. **RSA 签名本地强校验**：使用我们在后台生成的公钥，对服务器返回的 License 内容进行严密的离线签名验证。
+This system provides unbreakable server-side issuance and verification capabilities. However, to achieve a complete software commercial loop, **when integrating your client software (desktop apps/plugins, etc.)**, we strongly recommend adding:
+1. **VMP Packing / Code Obfuscation**: Prevent crackers from decompiling to extract the public key or skipping the verification logic.
+2. **Device Fingerprint Obfuscation**: Collect multi-dimensional information such as Motherboard/CPU/MAC address and hash them to serve as the `HardwareId`.
+3. **Strong Local RSA Signature Verification**: Use the public key generated in our backend to perform rigorous offline signature verification on the License content returned by the server.
 
 > [!IMPORTANT]
-> 您的软件只需发送 JSON: `{ "licenseKey": "...", "hardwareId": "..." }` 即可完成智能绑定，无需让用户输入任何个人信息。
+> Your software only needs to send JSON: `{ "licenseKey": "...", "hardwareId": "..." }` to complete intelligent binding, without requiring the user to input any personal information.
 
 ---
 
-🎉 祝您的商业软件大卖！
+🎉 Wishing your commercial software great success!

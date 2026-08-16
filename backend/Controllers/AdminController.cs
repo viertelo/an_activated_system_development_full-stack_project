@@ -29,11 +29,18 @@ namespace backend.Controllers
         }
 
         [HttpGet("audit-logs")]
-        public async Task<IActionResult> GetAuditLogs([FromQuery] string? action, [FromQuery] bool? isSuccess, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+        public async Task<IActionResult> GetAuditLogs(
+            [FromQuery] string? action, 
+            [FromQuery] bool? isSuccess, 
+            [FromQuery] DateTime? startDate, 
+            [FromQuery] DateTime? endDate,
+            [FromQuery] string? keyword,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 50)
         {
             var query = _context.AuditLogs.AsQueryable();
 
-            if (!string.IsNullOrEmpty(action))
+            if (!string.IsNullOrEmpty(action) && action != "all")
                 query = query.Where(l => l.Action == action);
 
             if (isSuccess.HasValue)
@@ -45,10 +52,23 @@ namespace backend.Controllers
             if (endDate.HasValue)
                 query = query.Where(l => l.Timestamp <= endDate.Value);
 
-            // 默认返回最近100条记录，避免数据量过大
-            var logs = await query.AsNoTracking().OrderByDescending(l => l.Timestamp).Take(100).ToListAsync();
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                var lowerKeyword = keyword.ToLower();
+                query = query.Where(l => 
+                    l.Operator.ToLower().Contains(lowerKeyword) || 
+                    l.Details.ToLower().Contains(lowerKeyword) ||
+                    l.Target.ToLower().Contains(lowerKeyword));
+            }
 
-            return Ok(logs);
+            var total = await query.CountAsync();
+            var logs = await query.AsNoTracking()
+                                  .OrderByDescending(l => l.Timestamp)
+                                  .Skip((page - 1) * pageSize)
+                                  .Take(pageSize)
+                                  .ToListAsync();
+
+            return Ok(new { total, data = logs });
         }
 
         [HttpPost("generate-license")]

@@ -5,6 +5,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import SecurityLogs from '@/components/SecurityLogs';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
@@ -831,7 +832,7 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab('dashboard')}
             className={`w-full text-left px-4 py-2 rounded-lg transition-colors font-medium ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'}`}
           >
-            大盘与发卡
+            商业运营与风控大盘
           </button>
           <button 
             onClick={() => setActiveTab('users')}
@@ -850,6 +851,12 @@ export default function AdminDashboard() {
             className={`w-full text-left px-4 py-2 rounded-lg transition-colors font-medium ${activeTab === 'api-docs' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'}`}
           >
             API 使用说明
+          </button>
+          <button 
+            onClick={() => setActiveTab('security_logs')}
+            className={`w-full text-left px-4 py-2 rounded-lg transition-colors font-medium flex items-center justify-between ${activeTab === 'security_logs' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'}`}
+          >
+            风控安全中心
           </button>
           <button 
             onClick={() => setActiveTab('help')}
@@ -888,7 +895,7 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab('dashboard')}
             className={`flex-1 px-4 py-2 text-sm font-medium rounded ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 dark:text-gray-300'}`}
           >
-            大盘与发卡
+            商业运营与风控大盘
           </button>
           <button 
             onClick={() => setActiveTab('users')}
@@ -907,6 +914,12 @@ export default function AdminDashboard() {
             className={`flex-1 px-4 py-2 text-sm font-medium rounded ${activeTab === 'api-docs' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 dark:text-gray-300'}`}
           >
             API 接口
+          </button>
+          <button 
+            onClick={() => setActiveTab('security_logs')}
+            className={`flex-1 px-4 py-2 text-sm font-medium rounded ${activeTab === 'security_logs' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-700 dark:text-gray-300'}`}
+          >
+            安全中心
           </button>
           <button 
             onClick={() => setActiveTab('help')}
@@ -950,8 +963,14 @@ export default function AdminDashboard() {
                       <div className="text-sm text-blue-600 dark:text-blue-400">今日新增激活</div>
                       <div className="text-3xl font-bold text-blue-900 dark:text-blue-100 mt-2">{stats.todayActivations}</div>
                     </div>
-                    <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800">
-                      <div className="text-sm text-red-600 dark:text-red-400">今日风控拦截攻击</div>
+                    <div 
+                      className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                      onClick={() => setActiveTab('security_logs')}
+                    >
+                      <div className="text-sm text-red-600 dark:text-red-400 flex items-center justify-between">
+                        今日风控拦截攻击
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                      </div>
                       <div className="text-3xl font-bold text-red-900 dark:text-red-100 mt-2">{stats.todayBlocks}</div>
                     </div>
                     <div 
@@ -1453,6 +1472,10 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'security_logs' && (
+          <SecurityLogs apiFetch={apiFetch} />
         )}
       </div>
     </div>

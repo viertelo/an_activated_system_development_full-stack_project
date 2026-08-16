@@ -124,6 +124,8 @@ namespace backend.Controllers
                 return Unauthorized(new { Message = $"密码错误次数过多，账号已锁定，请 {remainingMinutes} 分钟后再试。" });
             }
 
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown IP";
+
             var hashedPw = HashPassword(dto.Password);
             if (user.PasswordHash != hashedPw)
             {
@@ -139,7 +141,7 @@ namespace backend.Controllers
                     Operator = dto.Email,
                     Target = "System",
                     IsSuccess = false,
-                    Details = $"密码错误 (连续错误 {user.FailedLoginAttempts} 次)"
+                    Details = $"[IP: {ip}] 密码错误 (连续错误 {user.FailedLoginAttempts} 次)"
                 });
                 await _context.SaveChangesAsync();
                 
@@ -161,7 +163,7 @@ namespace backend.Controllers
                     Operator = dto.Email,
                     Target = $"UserId:{user.Id}",
                     IsSuccess = false,
-                    Details = "邮箱未验证"
+                    Details = $"[IP: {ip}] 邮箱未验证"
                 });
                 await _context.SaveChangesAsync();
                 return Unauthorized(new { Message = "必须确认邮箱后才能开通账户并登录。" });
@@ -184,7 +186,7 @@ namespace backend.Controllers
                         Operator = dto.Email,
                         Target = $"UserId:{user.Id}",
                         IsSuccess = false,
-                        Details = "二步验证码(2FA)无效或未提供"
+                        Details = $"[IP: {ip}] 二步验证码(2FA)无效或未提供"
                     });
                     await _context.SaveChangesAsync();
                     return Unauthorized(new { Message = "二步验证码(2FA)无效或未提供。" });
@@ -193,6 +195,16 @@ namespace backend.Controllers
 
             // 登录成功，颁发 SessionToken
             user.CurrentSessionToken = Guid.NewGuid().ToString();
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "UserLogin",
+                Operator = dto.Email,
+                Target = $"UserId:{user.Id}",
+                IsSuccess = true,
+                Details = $"[IP: {ip}] 登录成功"
+            });
+
             await _context.SaveChangesAsync();
 
             return Ok(new { 

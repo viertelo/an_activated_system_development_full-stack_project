@@ -85,6 +85,7 @@ export default function SecurityLogs({ apiFetch }: SecurityLogsProps) {
   const getActionLabel = (act: string) => {
     switch (act) {
       case 'UserLogin': return '用户登录';
+      case 'PasskeyLogin': return '通行密钥登录';
       case 'RateLimitBlocked': return '风控拦截';
       case 'DeviceActivate': return '设备激活';
       default: return act;
@@ -94,6 +95,7 @@ export default function SecurityLogs({ apiFetch }: SecurityLogsProps) {
   const getActionColor = (act: string) => {
     switch (act) {
       case 'UserLogin': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'PasskeyLogin': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
       case 'RateLimitBlocked': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
       case 'DeviceActivate': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
@@ -115,10 +117,11 @@ export default function SecurityLogs({ apiFetch }: SecurityLogsProps) {
           <select 
             value={action} 
             onChange={e => { setAction(e.target.value); setPage(1); }}
-            className="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
           >
             <option value="all">所有事件</option>
             <option value="UserLogin">登录记录</option>
+            <option value="PasskeyLogin">通行密钥登录</option>
             <option value="RateLimitBlocked">风控拦截</option>
             <option value="DeviceActivate">授权激活</option>
           </select>
@@ -126,7 +129,7 @@ export default function SecurityLogs({ apiFetch }: SecurityLogsProps) {
           <select 
             value={status} 
             onChange={e => { setStatus(e.target.value); setPage(1); }}
-            className="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
           >
             <option value="all">所有状态</option>
             <option value="success">成功 / 正常</option>
@@ -139,7 +142,7 @@ export default function SecurityLogs({ apiFetch }: SecurityLogsProps) {
               placeholder="搜索 IP、邮箱或目标..." 
               value={keyword}
               onChange={e => setKeyword(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400 text-gray-900 dark:text-white"
             />
             <button 
               type="submit"

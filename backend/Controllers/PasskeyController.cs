@@ -194,13 +194,14 @@ namespace backend.Controllers
             user.LockoutEnd = null;
             user.CurrentSessionToken = Guid.NewGuid().ToString();
             
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             _context.AuditLogs.Add(new AuditLog
             {
                 Action = "PasskeyLogin",
                 Operator = user.Email,
                 Target = $"UserId:{user.Id}",
                 IsSuccess = true,
-                Details = "WebAuthn assertion success"
+                Details = $"[IP: {ip}] WebAuthn assertion success"
             });
 
             await _context.SaveChangesAsync();

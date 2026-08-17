@@ -128,6 +128,28 @@ server {
 }
 ```
 
+### 4.2 使用 Cloudflare 等 CDN 时的真实 IP 透传 (极为重要)
+
+如果您的服务器外部套用了 Cloudflare 或其他 CDN 代理，或者使用了 Docker 的端口映射（此时请求看似来自 Docker 内部网关的局域网 IP），**后端系统和审计日志可能会记录到错误的局域网 IP 或 CDN 节点 IP**。
+
+为了确保审计日志和频控功能（Rate Limiting）能获取到真正的客户端访问地 IP：
+
+- **针对 Cloudflare：** 必须在 Nginx 代理配置中强制使用 Cloudflare 专属的 `CF-Connecting-IP` 头来替代默认的 `$remote_addr` 或 `$proxy_add_x_forwarded_for`。
+- 请将您的 `nginx.conf` （包括外层宿主机 Nginx 以及内部 `frontend/nginx.conf`）中对后端的代理头部修改为如下配置：
+
+```nginx
+    location /api/ {
+        proxy_pass http://backend:5000;
+        proxy_set_header Host $host;
+        
+        # 强制将 CF 的真实 IP 传给后端（针对使用 Cloudflare 的情况）
+        proxy_set_header X-Real-IP $http_cf_connecting_ip;
+        proxy_set_header X-Forwarded-For $http_cf_connecting_ip;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+```
+*注：如果不使用 Cloudflare 而是直接暴露宿主机 Nginx，请保持原样的 `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`。*
+
 ---
 
 ## 5. 高级安全凭证管理 (绝不要在文件中明文保存密码)

@@ -1471,6 +1471,29 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center">
+                    <span className="bg-indigo-100 text-indigo-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-indigo-900 dark:text-indigo-300">6</span>
+                    数据备份与灾难恢复 (核心业务数据)
+                  </h3>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-3 pl-8 border-l-2 border-gray-100 dark:border-gray-700 ml-2">
+                    <p>您的所有用户信息、激活码及设备绑定数据均安全地存储在 Docker 内的 PostgreSQL 数据库中。建议定期进行备份以防意外。</p>
+                    <p><strong>备份数据 (直接在服务器终端执行)：</strong></p>
+                    <pre className="bg-gray-100 dark:bg-gray-900 p-2 rounded-md overflow-x-auto text-xs font-mono text-gray-800 dark:text-gray-200">
+                      docker exec -t activation_db pg_dump -U activate_admin -d activation_db -F c -f /tmp/db_backup.dump{'\n'}
+                      docker cp activation_db:/tmp/db_backup.dump ./backup_db.dump
+                    </pre>
+                    <p><strong>恢复数据 (将覆盖现有数据，请谨慎操作)：</strong></p>
+                    <pre className="bg-gray-100 dark:bg-gray-900 p-2 rounded-md overflow-x-auto text-xs font-mono text-gray-800 dark:text-gray-200">
+                      docker cp ./backup_db.dump activation_db:/tmp/db_backup.dump{'\n'}
+                      docker exec -it activation_db pg_restore -U activate_admin -d activation_db -1 --clean /tmp/db_backup.dump
+                    </pre>
+                    <p className="text-orange-600 dark:text-orange-400 font-semibold">
+                      重要提示：服务器系统完整迁移时，您除了导出数据库，还必须妥善打包备份整个项目目录下的 <code>./data/keys/</code> 文件夹，其中包含极其重要的 RSA 私钥。私钥若丢失，将导致以前签发的所有激活码在离线校验时失效！
+                    </p>
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>

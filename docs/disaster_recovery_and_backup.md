@@ -16,9 +16,21 @@
 
 ## 2. 物理层异地灾备 (自动化定时备份)
 
-虽然 Docker Volume 防止了容器级的灾难，但如果**服务器整机硬盘损坏、重装系统或遭遇勒索病毒**，数据仍有彻底丢失的风险。为了防御物理级别的毁灭打击，我们为您准备了自动化备份脚本。
+虽然 Docker Volume 防止了容器级的灾难，但如果**服务器整机硬盘损坏、重装系统或遭遇勒索病毒**，数据仍有彻底丢失的风险。为了防御物理级别的毁灭打击，您必须进行备份。
 
-### 2.1 自动化备份脚本 (`scripts/backup.sh`)
+### 2.1 手动单次备份 (随时可用)
+如果您只需要临时进行一次完整的数据库备份（例如在系统升级、搬迁前），可以直接在服务器终端执行以下两条命令：
+
+```bash
+# 1. 在容器内部生成备份文件
+docker exec -t activation_db pg_dump -U activate_admin -d activation_db -F c -f /tmp/db_backup.dump
+
+# 2. 将备份文件从容器内拷贝到宿主机当前目录
+docker cp activation_db:/tmp/db_backup.dump ./backup_db_$(date +%Y%m%d).dump
+```
+*(注意：除了数据库，请务必连同根目录下的 `data/keys` 文件夹一起打包备份，里面包含了极为重要的 RSA 私钥！)*
+
+### 2.2 自动化备份脚本 (`scripts/backup.sh`)
 我们在项目根目录的 `scripts` 文件夹下为您准备了 `backup.sh`，它可以一键利用 `pg_dump` 将数据库完整导出为安全的二进制转储文件 (`.dump`)，并**同时将您的 RSA 公私钥文件夹 (`data/keys`) 打包为 `.tar.gz` 压缩包**，自动清理 7 天前的旧备份。
 
 **配置自动备份 (Linux Crontab)：**
@@ -59,9 +71,12 @@
    # 建立新库
    docker exec -t activation_db createdb -U activate_admin activation_db
    ```
-5. **导入备份数据**：
-   使用 `pg_restore` 恢复物理备份文件（注意替换最后的路径为您实际的备份文件路径）：
+   使用 `pg_restore` 恢复物理备份文件（注意替换备份文件名为您实际的文件）：
    ```bash
-   docker exec -i activation_db pg_restore -U activate_admin -d activation_db -1 < /root/activation_db_xxx.dump
+   # 1. 将物理机上的备份文件拷贝进容器的 /tmp 目录
+   docker cp ./activation_db_xxx.dump activation_db:/tmp/db_backup.dump
+
+   # 2. 在容器内执行恢复命令
+   docker exec -it activation_db pg_restore -U activate_admin -d activation_db -1 --clean /tmp/db_backup.dump
    ```
 6. **恢复完成**：导入成功后，您通过 Web 浏览器或 API 访问，所有管理员账号、激活码资产、设备指纹等数据将**原封不动地全部归位**，系统恢复正常营业！

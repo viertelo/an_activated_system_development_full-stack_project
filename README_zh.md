@@ -9,7 +9,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16_Turbopack-black.svg?style=for-the-badge&logo=next.js)](#)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1.svg?style=for-the-badge&logo=postgresql)](#)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=for-the-badge&logo=docker)](#)
-[![Security](https://img.shields.io/badge/Security-Passkey_%7C_RSA_2048-success.svg?style=for-the-badge)](#)
+[![Security](https://img.shields.io/badge/Security-Passkey_%7C_Ed25519-success.svg?style=for-the-badge)](#)
 
 <br/>
 
@@ -31,10 +31,11 @@
 > **为发卡网/经销商量身定制**：终端用户在激活时 **无需提供邮箱、无需注册**。仅凭一串激活码与设备指纹即可完成一键绑定。最大化降低 C 端使用门槛！
 
 - 🔄 **智能换机与自动踢出 (Auto-Revoke & Device Transfer)**：支持为激活码配置“最大设备数(MaxDevices)”与“最大换机次数(MaxActivations)”。当用户在全新设备上激活时，若设备槽已满且允许换机，系统将**自动踢出最老的设备**。轻松实现限制多开的同时免去人工解绑的烦恼。
-- 🔐 **零暴露级密码学安全 (离线 RSA 防篡改)**：数据库仅存储激活码的 SHA256 哈希值。客户端离线校验采用 2048 位 `RSA + SHA256` 数字签名机制，从根本上防止客户端破解者伪造或篡改授权到期时间。
+- 🔐 **零暴露级密码学安全 (离线 Ed25519/RSA 防篡改)**：数据库仅存储激活码的 SHA256 哈希值。客户端离线校验采用数字签名机制，从根本上防止客户端破解者伪造或篡改授权到期时间。
 - 📱 **硬件级无密码认证 (Passkey & WebAuthn)**：管理员后台除了支持传统账号密码外，全面支持现代化 **Passkey (通行密钥/指纹/面容)** 登录。将内部管理账户被盗风险降至物理级别的最低点。
+- 🪝 **Webhooks 与 API 密钥 (无缝集成)**：内置事件驱动的 Webhooks（如 `LicenseGenerated`、`DeviceActivated`），支持向外部系统实时推送通知。此外，系统提供 **Admin API Keys**，为外部自动发卡商城提供安全、编程式且物理隔离的接口调用能力。
 - 🛡️ **账号防爆破与防并发 (Concurrent Login Prevention)**：支持同一超级管理员账号多地登录**自动互踢**，严格保证 Session 唯一性。内置密码试错防爆破系统，连续输入错误 3 次即锁定账号 15 分钟。
-- 📊 **高性能数据大盘与风控安全中心 (Analytics & Security)**：内置图形化管理员看板 (`/admin`)，实时双轨呈现 **RSA 公钥快速查看** 与 **异常拦截攻击量**。支持一秒生成千张授权码，并提供专属的**风控安全中心**，全方位追踪管理员操作（含 Passkey 登录 IP 捕获）与恶意拦截日志。
+- 📊 **高性能数据大盘与风控安全中心 (Analytics & Security)**：内置图形化管理员看板 (`/admin`)，实时双轨呈现 **实时异常拦截攻击量**。支持一秒生成千张授权码，并提供专属的**风控安全中心**，全方位追踪管理员操作（含 Passkey 登录 IP 捕获）与恶意拦截日志。
 - 🛡️ **严格的安全环境隔离与特权测试面板**：专门打造独立的 `/test-activation` 页面供商业测试使用，提供一键解绑、随机硬件ID、强制重置已激活次数等特权功能。所有特权 API (`ResetActivations`, `Deactivate` 等) 均由 `[SessionAuth]` 层层把守，与正式商用的 `Activate` 接口物理和逻辑分离，坚决防止越权滥用。
 - 🧩 **序列化兼容性保障 (Case-Insensitive Serialization)**：前端通信库经过全面强化，对于服务端混合响应（如 `PascalCase` 和 `camelCase` 混合情况）提供无感自适应。完全规避了 WebAPI 与前端 JSON.parse() 在异构交互中的反序列化异常。
 - 🚀 **极致轻量化与全栈性能优化**：前端采用 Next.js 16 (Static Export) 静态构建，无缝适配 Nginx；后端采用极小体积的 .NET Alpine 镜像，底层集成 **IMemoryCache 内存级高速缓存** 及 Entity Framework 无追踪查询优化，应对高并发抢购/大批量激活稳如泰山。
@@ -45,10 +46,11 @@
 ## 📂 项目结构 (Repository Structure)
 
 ```text
-├── backend/                # 🛠️ C# .NET 10 WebAPI 后端 (鉴权、RSA签发、并发锁、设备清洗逻辑)
+├── backend/                # 🛠️ C# .NET 10 WebAPI 后端 (鉴权、API Key、Webhook、Ed25519签名)
 ├── frontend/               # 💻 Next.js 16 静态前端 (图表大盘、发卡面板、Passkey 等)
-├── docs/                   # 📚 核心文档库 (开发指南、架构解析、API 规范)
+├── docs/                   # 📚 核心文档库
 │   ├── architecture_and_workflow.md
+│   ├── features_and_usage.md
 │   ├── disaster_recovery_and_backup.md
 │   ├── local_network_deployment_guide.md
 │   └── production_server_deployment_and_security.md
@@ -67,6 +69,7 @@
 
 强烈建议您在进行任何操作前，先前往 [`docs/`](./docs) 目录查阅文档。
 👉 **首推必读**：**[核心架构、工作流与 API 对接指南 (Architecture & Workflow)](./docs/architecture_and_workflow.md)**
+👉 **高级进阶 (Webhooks, API Key, 测试面板)**：**[核心特性与使用手册 (Features & Usage)](./docs/features_and_usage.md)**
 
 ### 2. 部署到服务器 (生产环境)
 
@@ -102,7 +105,7 @@
 
 1. **VMP 加壳 / 代码混淆**：防止黑客反编译提取公钥或跳过验证逻辑。
 2. **设备指纹混淆**：采集主板/CPU/网卡 MAC 等多维度信息并哈希化作为 `HardwareId`。
-3. **RSA 签名本地强校验**：使用我们在后台生成的公钥，对服务器返回的 License 内容进行严密的离线签名验证。
+3. **本地强效离线验证**：使用随客户端打包的公钥，对服务器返回的 Base64 签名串进行严密的离线签名验证。
 
 > [!IMPORTANT]
 > 您的软件只需发送 JSON: `{ "licenseKey": "...", "hardwareId": "..." }` 即可完成智能绑定，无需让用户输入任何个人信息。

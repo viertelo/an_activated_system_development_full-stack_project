@@ -9,7 +9,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16_Turbopack-black.svg?style=for-the-badge&logo=next.js)](#)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1.svg?style=for-the-badge&logo=postgresql)](#)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=for-the-badge&logo=docker)](#)
-[![Security](https://img.shields.io/badge/Security-Passkey_%7C_RSA_2048-success.svg?style=for-the-badge)](#)
+[![Security](https://img.shields.io/badge/Security-Passkey_%7C_Ed25519-success.svg?style=for-the-badge)](#)
 
 <br/>
 
@@ -31,10 +31,11 @@
 > **Tailored for License Distributors & Resellers**: End-users **do not need to provide an email or register** during activation. A single license key and a hardware footprint are all that's required for one-click binding. This minimizes the barrier to entry for end consumers!
 
 - 🔄 **Auto-Revoke & Device Transfer**: Supports configuring "Max Devices" and "Max Activations (Transfers)" for license keys. When a user activates on a new device, if all slots are full but transfers are allowed, the system will **automatically revoke the oldest device**.
-- 🔐 **Zero-Exposure Cryptographic Security (Offline RSA Anti-Tampering)**: The database only stores the SHA256 hash of the license keys. Offline client-side verification uses a 2048-bit `RSA + SHA256` digital signature mechanism, fundamentally preventing crackers from forging or tampering with expiration dates.
+- 🔐 **Zero-Exposure Cryptographic Security (Offline Ed25519/RSA Anti-Tampering)**: The database only stores the SHA256 hash of the license keys. Offline client-side verification uses a digital signature mechanism, fundamentally preventing crackers from forging or tampering with expiration dates.
 - 📱 **Hardware-Level Passwordless Authentication (Passkey & WebAuthn)**: In addition to traditional passwords, the admin dashboard fully supports modernized **Passkey (Biometrics/FaceID)** logins, reducing the risk of internal admin account theft to the lowest physical level.
+- 🪝 **Webhooks & API Keys (Seamless Integration)**: Built-in event-driven Webhooks (`LicenseGenerated`, `DeviceActivated`, etc.) for real-time notifications to external systems (ERP, Slack). Features **Admin API Keys** for secure, programmatic, and isolated license generation from external automated storefronts.
 - 🛡️ **Anti-Brute Force & Concurrent Login Prevention**: Supports **auto-kick** for the same super admin account logged in from multiple locations. Built-in brute-force prevention locks the account for 15 minutes after 3 consecutive incorrect password attempts.
-- 📊 **High-Performance Analytics Dashboard & Security Center**: Features a graphical admin dashboard (`/admin`) for **Quick RSA Public Key Access** and tracking **Intercepted Attack Volumes** in real-time. Supports generating thousands of keys in a single second and features a dedicated **Security Center** tracking all admin operations (including Passkey login IPs) and malicious intercept logs.
+- 📊 **High-Performance Analytics Dashboard & Security Center**: Features a graphical admin dashboard (`/admin`) for tracking **Intercepted Attack Volumes** in real-time. Supports generating thousands of keys in a single second and features a dedicated **Security Center** tracking all admin operations (including Passkey login IPs) and malicious intercept logs.
 - 🛡️ **Strict Environment Isolation & Testing Privileges**: A standalone `/test-activation` page is crafted specifically for commercial testing, offering privileged functions like one-click unbinding, randomizing hardware IDs, and forcing activation resets. All privileged APIs (`ResetActivations`, `Deactivate`, etc.) are heavily guarded by `[SessionAuth]`, physically and logically isolated from the production `Activate` API to firmly prevent privilege abuse.
 - 🧩 **Case-Insensitive Serialization Resilience**: The frontend communication layer is fully fortified to natively adapt to mixed server responses (e.g., handling both `PascalCase` and `camelCase` payloads). This completely eliminates deserialization anomalies between WebAPI and frontend `JSON.parse()` during heterogeneous interactions.
 - 🚀 **Extreme Lightweight & Full-Stack Optimization**: The frontend uses Next.js 16 (Static Export) for static building. The backend uses a tiny .NET Alpine image, integrating **IMemoryCache** for high-speed memory caching and Entity Framework no-tracking query optimizations.
@@ -45,10 +46,11 @@
 ## 📂 Repository Structure
 
 ```text
-├── backend/                # 🛠️ C# .NET 10 WebAPI Backend (Auth, RSA, Locks, Device Logic)
+├── backend/                # 🛠️ C# .NET 10 WebAPI Backend (Auth, API Keys, Webhooks, Ed25519)
 ├── frontend/               # 💻 Next.js 16 Static Frontend (Dashboard, License Gen, Passkey)
 ├── docs/                   # 📚 Core Documentation Library
 │   ├── architecture_and_workflow.md
+│   ├── features_and_usage.md
 │   ├── disaster_recovery_and_backup.md
 │   ├── local_network_deployment_guide.md
 │   └── production_server_deployment_and_security.md
@@ -67,6 +69,7 @@
 
 It is highly recommended that you consult the [`docs/`](./docs) directory before performing any operations.
 👉 **Highly Recommended First Read**: **[Core Architecture, Workflow & API Integration Guide](./docs/architecture_and_workflow.md)**
+👉 **Advanced Features (Webhooks, API Keys, Testing)**: **[Features & Usage Guide](./docs/features_and_usage.md)**
 
 ### 2. Deploy to Server (Production Environment)
 
@@ -102,7 +105,7 @@ This system provides unbreakable server-side issuance and verification capabilit
 
 1. **VMP Packing / Code Obfuscation**: Prevent crackers from decompiling to extract the public key or skipping the verification logic.
 2. **Device Fingerprint Obfuscation**: Collect multi-dimensional information such as Motherboard/CPU/MAC address and hash them to serve as the `HardwareId`.
-3. **Strong Local RSA Signature Verification**: Use the public key generated in our backend to perform rigorous offline signature verification on the License content returned by the server.
+3. **Strong Local Offline Signature Verification**: Use the public key to perform rigorous offline signature verification on the Base64 License content returned by the server.
 
 > [!IMPORTANT]
 > Your software only needs to send JSON: `{ "licenseKey": "...", "hardwareId": "..." }` to complete intelligent binding, without requiring the user to input any personal information.

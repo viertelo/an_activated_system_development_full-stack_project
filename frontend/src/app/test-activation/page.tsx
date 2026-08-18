@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 export default function TestActivationPage() {
   const [publicKey, setPublicKey] = useState('');
@@ -13,8 +14,17 @@ export default function TestActivationPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [errorDetails, setErrorDetails] = useState<any>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const router = useRouter();
 
   useEffect(() => {
+    // 权限校验：如果未登录，重定向到登录页
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      toast.error('请先登录系统');
+      router.push('/');
+      return;
+    }
+
     if (typeof window !== 'undefined') {
       const isDark = document.documentElement.classList.contains('dark') || window.matchMedia('(prefers-color-scheme: dark)').matches;
       setTheme(isDark ? 'dark' : 'light');

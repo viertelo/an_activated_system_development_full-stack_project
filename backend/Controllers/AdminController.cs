@@ -327,7 +327,7 @@ namespace backend.Controllers
             user.PasswordHash = Convert.ToBase64String(hash);
             
             // 踢出用户的当前会话（为了安全，重置密码后使当前设备外都失效）
-            user.CurrentSessionToken = Guid.NewGuid().ToString();
+            user.CurrentSessionToken = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
             user.FailedLoginAttempts = 0;
             user.LockoutEnd = null;
 

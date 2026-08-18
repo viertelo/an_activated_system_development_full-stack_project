@@ -192,7 +192,7 @@ namespace backend.Controllers
             // Reset lockout and issue Session Token
             user.FailedLoginAttempts = 0;
             user.LockoutEnd = null;
-            user.CurrentSessionToken = Guid.NewGuid().ToString();
+            user.CurrentSessionToken = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
             
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             _context.AuditLogs.Add(new AuditLog

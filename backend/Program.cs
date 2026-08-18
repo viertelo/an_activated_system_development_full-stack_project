@@ -83,17 +83,10 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = async (context, token) =>
     {
         var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown IP";
-        var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-        db.AuditLogs.Add(new backend.Models.AuditLog
-        {
-            Action = "RateLimitBlocked",
-            Operator = ip,
-            Target = context.HttpContext.Request.Path.Value ?? "Unknown",
-            IsSuccess = false,
-            Details = "风控：触发IP高频请求限制",
-            Timestamp = System.DateTime.UtcNow
-        });
-        await db.SaveChangesAsync(token);
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+        
+        // 【安全修复】仅记录到标准日志，不要在此处同步写数据库，防止拒绝服务攻击(DoS)和连接池耗尽
+        logger.LogWarning("风控：触发IP高频请求限制。来源IP: {IP}, 目标路径: {Path}", ip, context.HttpContext.Request.Path.Value);
         
         context.HttpContext.Response.StatusCode = 429;
         await context.HttpContext.Response.WriteAsync("请求过于频繁，已被风控拦截，请稍后重试。", cancellationToken: token);
@@ -170,9 +163,13 @@ app.UseExceptionHandler(errorApp =>
         context.Response.ContentType = "application/json";
         
         var exceptionHandlerPathFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
-        var errorMessage = exceptionHandlerPathFeature?.Error?.Message ?? "服务器内部异常，请稍后重试。";
+        var exception = exceptionHandlerPathFeature?.Error;
         
-        await context.Response.WriteAsJsonAsync(new { Message = "系统内部错误: " + errorMessage });
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogError(exception, "全局捕获到未处理异常");
+        
+        // 【安全修复】在生产环境中绝不向客户端暴露具体的错误异常信息，防止路径泄漏和SQL暴露
+        await context.Response.WriteAsJsonAsync(new { Message = "系统内部错误，请稍后重试。" });
     });
 });
 

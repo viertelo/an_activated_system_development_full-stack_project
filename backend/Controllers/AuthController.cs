@@ -193,8 +193,8 @@ namespace backend.Controllers
                 }
             }
 
-            // 登录成功，颁发 SessionToken
-            user.CurrentSessionToken = Guid.NewGuid().ToString();
+            // 登录成功，颁发 SessionToken (升级为高强度加密随机数)
+            user.CurrentSessionToken = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
             _context.AuditLogs.Add(new AuditLog
             {

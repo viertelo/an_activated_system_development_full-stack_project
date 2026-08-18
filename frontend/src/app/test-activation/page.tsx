@@ -57,12 +57,27 @@ export default function TestActivationPage() {
     toast.success('硬件码已重新生成');
   };
 
+  const apiFetch = async (url: string, options: RequestInit = {}) => {
+    const sessionToken = localStorage.getItem('sessionToken');
+    const userStr = localStorage.getItem('user');
+    const headers = new Headers(options.headers || {});
+    if (sessionToken) headers.append('X-Session-Token', sessionToken);
+    if (userStr) {
+      try {
+        const parsed = JSON.parse(userStr);
+        if (parsed.userId) headers.append('X-User-Id', parsed.userId);
+      } catch (e) {}
+    }
+    return fetch(url, { ...options, headers });
+  };
+
   const fetchPublicKey = async () => {
     try {
-      const res = await fetch('/api/License/public-key/text');
+      const res = await apiFetch('/api/License/public-key/text');
       const data = await res.json();
-      if (res.ok && data.PublicKey) {
-        setPublicKey(data.PublicKey);
+      const keyStr = data.publicKey || data.PublicKey;
+      if (res.ok && keyStr) {
+        setPublicKey(keyStr);
         toast.success('公钥已自动加载');
       } else {
         toast.error('获取公钥失败');
@@ -234,24 +249,23 @@ export default function TestActivationPage() {
   const refreshLicenseInfo = async () => {
     if (!licenseKey) return;
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/License/info', {
+      const res = await apiFetch('/api/License/info', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ licenseKey })
       });
       const data = await res.json();
-      if (res.ok && data.Details) {
-        setServerDetails(data.Details);
+      const details = data.details || data.Details;
+      if (res.ok && details) {
+        setServerDetails(details);
         // 如果验签状态是 success，同时也更新 result 中的激活设备数，以便 UI 同步更新
         if (result && verifyStatus === 'success') {
            setResult((prev: any) => ({
              ...prev,
-             ActivatedCount: data.Details.ActivatedCount,
-             RemainingCount: data.Details.RemainingCount
+             ActivatedCount: details.activatedCount ?? details.ActivatedCount,
+             RemainingCount: details.remainingCount ?? details.RemainingCount
            }));
         }
       }
@@ -264,20 +278,19 @@ export default function TestActivationPage() {
     if (!licenseKey) return;
     setIsUnbinding(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/License/reset-activations', {
+      const res = await apiFetch('/api/License/reset-activations', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ licenseKey })
       });
       const data = await res.json();
+      const msg = data.message || data.Message;
       if (!res.ok) {
-        throw new Error(data.Message || '重置失败');
+        throw new Error(msg || '重置失败');
       }
-      toast.success(data.Message || '重置成功');
+      toast.success(msg || '重置成功');
       
       // 更新当前界面信息，而不是重新执行激活
       await refreshLicenseInfo();
@@ -292,20 +305,19 @@ export default function TestActivationPage() {
     if (!hwId) return;
     setIsUnbinding(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/device/deactivate', {
+      const res = await apiFetch('/api/device/deactivate', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ hardwareId: hwId })
       });
       const data = await res.json();
+      const msg = data.message || data.Message;
       if (!res.ok) {
-        throw new Error(data.Message || '解绑失败');
+        throw new Error(msg || '解绑失败');
       }
-      toast.success(data.Message || '解绑成功');
+      toast.success(msg || '解绑成功');
       
       // 更新当前界面信息，而不是重新执行激活
       await refreshLicenseInfo();

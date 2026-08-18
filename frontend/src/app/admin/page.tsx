@@ -1494,6 +1494,25 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center">
+                    <span className="bg-teal-100 text-teal-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-teal-900 dark:text-teal-300">7</span>
+                    客户端激活测试与网络说明
+                  </h3>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-3 pl-8 border-l-2 border-gray-100 dark:border-gray-700 ml-2">
+                    <p>系统内置了 <strong>客户端激活模拟测试页面</strong>（路径：<a href="/test-activation" target="_blank" className="text-blue-600 hover:underline">/test-activation</a>），供您在浏览器中体验从“请求接口”到“本地公钥验签”的完整激活闭环，验证公私钥对及接口连通性。</p>
+                    <p><strong>关于 Cloudflare 等 CDN/WAF 的重要说明：</strong></p>
+                    <p>当您使用 Cloudflare 等防火墙并开启了严格的“防机器人（Bot Management）”或“JS 质询（Challenge）”时：</p>
+                    <ul className="list-disc pl-5 space-y-1 text-gray-700 dark:text-gray-300 font-medium">
+                      <li><strong>网页端测试（/test-activation）：</strong> 通常不受影响，因为浏览器会自动执行 JS 质询并带上正确的 Cookie。</li>
+                      <li><strong>真实的桌面端/移动端软件激活：</strong> 大部分原生 HTTP 客户端（如 C# HttpClient, Python Requests）无法执行 JS 代码，会直接被 Cloudflare 拦截并返回 503/403 错误或验证码 HTML 页面，导致软件无法激活。</li>
+                    </ul>
+                    <p className="text-orange-600 dark:text-orange-400 font-semibold">
+                      解决方案：请务必在 Cloudflare 或您的 WAF 中配置“页面规则（Page Rules）”或“WAF 规则”，针对 <code>/api/License/activate</code> 和 <code>/api/License/public-key</code> 等接口路径 <strong>跳过“安全质询”与“浏览器完整性检查”</strong>，或者对您客户端软件专属的 <code>User-Agent</code> 进行放行，确保纯 API 请求能直达后端。
+                    </p>
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>

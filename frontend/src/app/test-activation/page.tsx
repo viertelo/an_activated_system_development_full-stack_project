@@ -12,7 +12,9 @@ export default function TestActivationPage() {
   const [result, setResult] = useState<any>(null);
   const [verifyStatus, setVerifyStatus] = useState<'none' | 'success' | 'failed'>('none');
   const [errorMsg, setErrorMsg] = useState('');
-  const [errorDetails, setErrorDetails] = useState<any>(null);
+  const [serverDetails, setServerDetails] = useState<any>(null);
+  const [isUnbinding, setIsUnbinding] = useState(false);
+  const [offlineToken, setOfflineToken] = useState('');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const router = useRouter();
 
@@ -46,8 +48,28 @@ export default function TestActivationPage() {
 
   // Generate a mock hardware ID on load
   useEffect(() => {
-    setHardwareId(crypto.randomUUID());
+    if (!hardwareId) setHardwareId(crypto.randomUUID());
   }, []);
+
+  const randomizeHardwareId = () => {
+    setHardwareId(crypto.randomUUID());
+    toast.success('硬件码已重新生成');
+  };
+
+  const fetchPublicKey = async () => {
+    try {
+      const res = await fetch('/api/License/public-key/text');
+      const data = await res.json();
+      if (res.ok && data.PublicKey) {
+        setPublicKey(data.PublicKey);
+        toast.success('公钥已自动加载');
+      } else {
+        toast.error('获取公钥失败');
+      }
+    } catch (e) {
+      toast.error('网络请求失败');
+    }
+  };
 
   const str2ab = (str: string) => {
     const buf = new ArrayBuffer(str.length);
@@ -108,6 +130,49 @@ export default function TestActivationPage() {
     }
   };
 
+  const performLocalVerify = async (signatureStr: string) => {
+    if (!signatureStr || !signatureStr.includes('.')) {
+      throw new Error("签名格式不正确，应包含 '.'");
+    }
+    const [payloadBase64, signatureBase64] = signatureStr.split('.');
+    const cryptoKey = await importPublicKey(publicKey);
+    const isValid = await verifySignature(cryptoKey, payloadBase64, signatureBase64);
+    
+    if (isValid) {
+      setVerifyStatus('success');
+      toast.success('验签成功！');
+      const jsonStr = decodeURIComponent(escape(window.atob(payloadBase64)));
+      const payloadObj = JSON.parse(jsonStr);
+      setResult(payloadObj);
+    } else {
+      setVerifyStatus('failed');
+      setErrorMsg('验签失败：数据可能被篡改或公钥不匹配');
+      toast.error('验签失败：数据可能被篡改或公钥不匹配');
+    }
+  };
+
+  const handleOfflineTest = async () => {
+    if (!publicKey.trim() || !offlineToken.trim()) {
+      toast.error('请填写公钥和离线凭证');
+      return;
+    }
+    setLoading(true);
+    setVerifyStatus('none');
+    setErrorMsg('');
+    setServerDetails(null);
+    setResult(null);
+
+    try {
+      await performLocalVerify(offlineToken);
+    } catch (err: any) {
+      setVerifyStatus('failed');
+      setErrorMsg(err.message || '发生错误');
+      toast.error(err.message || '发生错误');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleActivate = async () => {
     if (!publicKey.trim() || !licenseKey.trim() || !hardwareId.trim()) {
       toast.error('请填写完整信息');
@@ -117,7 +182,7 @@ export default function TestActivationPage() {
     setLoading(true);
     setVerifyStatus('none');
     setErrorMsg('');
-    setErrorDetails(null);
+    setServerDetails(null);
     setResult(null);
 
     try {
@@ -146,41 +211,42 @@ export default function TestActivationPage() {
         throw err;
       }
 
+      setServerDetails(data.Details || data.details);
+
       toast.success('接口请求成功，开始本地验签...');
-
       const signatureStr = data.Signature || data.signature;
-      if (!signatureStr || !signatureStr.includes('.')) {
-        throw new Error("返回的签名格式不正确");
-      }
-
-      const [payloadBase64, signatureBase64] = signatureStr.split('.');
-
-      // 2. 导入公钥并验签
-      const cryptoKey = await importPublicKey(publicKey);
-      const isValid = await verifySignature(cryptoKey, payloadBase64, signatureBase64);
-
-      if (isValid) {
-        setVerifyStatus('success');
-        toast.success('验签成功！');
-        
-        // 解析 payload
-        // Escape and decodeURIComponent are used to correctly decode UTF-8 strings that were base64 encoded
-        const jsonStr = decodeURIComponent(escape(window.atob(payloadBase64)));
-        const payloadObj = JSON.parse(jsonStr);
-        setResult(payloadObj);
-      } else {
-        setVerifyStatus('failed');
-        setErrorMsg('验签失败：数据可能被篡改或公钥不匹配');
-        toast.error('验签失败：数据可能被篡改或公钥不匹配');
-      }
+      await performLocalVerify(signatureStr);
 
     } catch (err: any) {
       setVerifyStatus('failed');
       setErrorMsg(err.message || '发生错误');
-      setErrorDetails(err.details || null);
+      setServerDetails(err.details || null);
       toast.error(err.message || '发生错误');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUnbind = async (hwId: string) => {
+    if (!hwId) return;
+    setIsUnbinding(true);
+    try {
+      const res = await fetch('/api/device/deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hardwareId: hwId })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.Message || '解绑失败');
+      }
+      toast.success(data.Message || '解绑成功');
+      // 重新执行激活查询以刷新状态
+      handleActivate();
+    } catch (err: any) {
+      toast.error(err.message || '解绑发生错误');
+    } finally {
+      setIsUnbinding(false);
     }
   };
 
@@ -215,13 +281,16 @@ export default function TestActivationPage() {
 
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              RSA 公钥 (PEM格式)
-            </label>
+            <div className="flex justify-between items-center">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                RSA 公钥 (PEM格式)
+              </label>
+              <button onClick={fetchPublicKey} className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium transition-colors">⚡ 一键获取服务器公钥</button>
+            </div>
             <div className="mt-1">
               <textarea
                 rows={5}
-                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white p-2 border"
+                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 text-gray-900 dark:text-white p-2 border"
                 placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"
                 value={publicKey}
                 onChange={(e) => setPublicKey(e.target.value)}
@@ -231,13 +300,16 @@ export default function TestActivationPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              设备标识 (Hardware ID)
-            </label>
+            <div className="flex justify-between items-center">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                设备标识 (Hardware ID)
+              </label>
+              <button onClick={randomizeHardwareId} className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium transition-colors">🎲 随机更换设备</button>
+            </div>
             <div className="mt-1">
               <input
                 type="text"
-                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white p-2 border"
+                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 text-gray-900 dark:text-white p-2 border"
                 value={hardwareId}
                 onChange={(e) => setHardwareId(e.target.value)}
               />
@@ -252,7 +324,7 @@ export default function TestActivationPage() {
             <div className="mt-1">
               <input
                 type="text"
-                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white p-2 border"
+                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 text-gray-900 dark:text-white p-2 border"
                 placeholder="请输入已生成的激活码"
                 value={licenseKey}
                 onChange={(e) => setLicenseKey(e.target.value)}
@@ -266,8 +338,35 @@ export default function TestActivationPage() {
               disabled={loading}
               className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {loading ? '正在激活...' : '执行激活与验签'}
+              {loading ? '正在激活...' : '执行在线激活与验签'}
             </button>
+          </div>
+
+          {/* 纯离线许可导入验证 */}
+          <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">🔧 纯离线许可导入测试</h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                离线授权证书 (Base64 Signature)
+              </label>
+              <div className="mt-1 flex space-x-2">
+                <input
+                  type="text"
+                  className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 text-gray-900 dark:text-white p-2 border"
+                  placeholder="粘贴由服务端生成的签名字符串"
+                  value={offlineToken}
+                  onChange={(e) => setOfflineToken(e.target.value)}
+                />
+                <button
+                  onClick={handleOfflineTest}
+                  disabled={loading}
+                  className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  离线验签
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">模拟断网环境，直接校验本地证书是否合法（需要上方先填入对应公钥）</p>
+            </div>
           </div>
 
           {/* 激活结果提示框 (嵌入在激活框内) */}
@@ -302,15 +401,15 @@ export default function TestActivationPage() {
                   </div>
                   
                   {/* 失败时展示的具体详情 (如有) */}
-                  {errorDetails && verifyStatus === 'failed' && (
+                  {serverDetails && verifyStatus === 'failed' && (
                     <div className="mt-4 bg-white dark:bg-gray-800 p-4 rounded-md border border-red-200 dark:border-red-800/50 shadow-sm">
                       <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">设备限额详情</div>
                       <div className="flex flex-wrap items-center gap-x-3 text-sm">
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">总配额: {errorDetails.maxDevices || errorDetails.MaxDevices} 台</span>
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">总配额: {serverDetails.maxDevices || serverDetails.MaxDevices} 台</span>
                         <span className="text-gray-300 dark:text-gray-600">|</span>
-                        <span className="font-semibold text-green-600 dark:text-green-400">已激活: {errorDetails.activatedCount ?? errorDetails.ActivatedCount} 台</span>
+                        <span className="font-semibold text-green-600 dark:text-green-400">已激活: {serverDetails.activatedCount ?? serverDetails.ActivatedCount} 台</span>
                         <span className="text-gray-300 dark:text-gray-600">|</span>
-                        <span className="font-semibold text-red-600 dark:text-red-400">剩余名额: {errorDetails.remainingCount ?? errorDetails.RemainingCount} 台</span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">剩余名额: {serverDetails.remainingCount ?? serverDetails.RemainingCount} 台</span>
                       </div>
                     </div>
                   )}
@@ -341,8 +440,54 @@ export default function TestActivationPage() {
                         <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{new Date(result.ActivatedAt).toLocaleString()}</div>
                       </div>
                       <div className="sm:col-span-2">
-                        <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">绑定设备ID</div>
+                        <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">当前绑定设备ID</div>
                         <div className="mt-1 font-mono text-sm text-gray-900 dark:text-gray-100 break-all bg-gray-50 dark:bg-gray-900 p-2 rounded border border-gray-100 dark:border-gray-700">{result.HardwareId}</div>
+                      </div>
+                      {result.LicenseType === 'Subscription' && result.ExpiresAt && (
+                        <div className="sm:col-span-2 mt-2">
+                          <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">订阅有效期进度</div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 overflow-hidden">
+                            <div 
+                              className="bg-blue-600 h-2.5 rounded-full transition-all duration-500" 
+                              style={{ width: `${Math.max(0, Math.min(100, ((Date.now() - new Date(result.ActivatedAt).getTime()) / (new Date(result.ExpiresAt).getTime() - new Date(result.ActivatedAt).getTime())) * 100))}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 解绑 / 换绑 提示及列表区 */}
+                  {serverDetails && (serverDetails.allowDeviceTransfer || serverDetails.AllowDeviceTransfer) && (serverDetails.devices || serverDetails.Devices)?.length > 0 && (
+                    <div className="mt-6 bg-blue-50 dark:bg-blue-900/30 p-4 rounded-md border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-200">💡 支持设备换绑</h4>
+                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">此授权码允许反激活。如果达到上限，您可以解绑以下任一设备来释放名额。</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {(serverDetails.devices || serverDetails.Devices).map((dev: any, idx: number) => (
+                          <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 shadow-sm gap-3">
+                            <div className="overflow-hidden">
+                              <div className="text-xs text-gray-500 dark:text-gray-400">硬件 ID</div>
+                              <div className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title={dev.hardwareId || dev.HardwareId}>
+                                {dev.hardwareId || dev.HardwareId}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                激活于: {new Date(dev.activatedAt || dev.ActivatedAt).toLocaleString()}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleUnbind(dev.hardwareId || dev.HardwareId)}
+                              disabled={isUnbinding}
+                              className={`flex-shrink-0 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ${isUnbinding ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {isUnbinding ? '处理中...' : '解绑此设备'}
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

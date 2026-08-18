@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using System.Linq;
 using System.IO;
 using System.IO.Compression;
 using backend.Services;
@@ -52,9 +53,30 @@ namespace backend.Controllers
 
             var result = await _licenseService.ActivateDeviceAsync(request.LicenseKey, request.HardwareId);
 
+            // 提取公共的详情构造逻辑
+            object? detailsObj = null;
+            if (result.ErrorCode != "INVALID" && result.LicenseInfo != null)
+            {
+                var boundDevices = _context.Devices
+                    .Where(d => d.LicenseId == result.LicenseInfo.Id)
+                    .Select(d => new { d.HardwareId, d.ActivatedAt })
+                    .ToList();
+                
+                var activatedCount = boundDevices.Count;
+                detailsObj = new
+                {
+                    LicenseType = result.LicenseInfo.LicenseType,
+                    MaxDevices = result.LicenseInfo.MaxDevices,
+                    ActivatedCount = activatedCount,
+                    RemainingCount = result.LicenseInfo.MaxDevices - activatedCount < 0 ? 0 : result.LicenseInfo.MaxDevices - activatedCount,
+                    AllowDeviceTransfer = result.LicenseInfo.AllowDeviceTransfer,
+                    Devices = boundDevices
+                };
+            }
+
             if (result.IsSuccess && result.LicenseInfo != null)
             {
-                var activatedCount = System.Linq.Queryable.Count(_context.Devices, d => d.LicenseId == result.LicenseInfo.Id);
+                var activatedCount = _context.Devices.Count(d => d.LicenseId == result.LicenseInfo.Id);
 
                 // 激活成功，生成离线 RSA 证书
                 var payload = new
@@ -69,30 +91,16 @@ namespace backend.Controllers
                 };
 
                 var signedToken = _rsaKeyService.SignData(payload);
-                return Ok(new { Message = "激活成功。", Signature = signedToken });
+                // 成功时一并返回 Details，供前端判断是否展示设备管理
+                return Ok(new { Message = "激活成功。", Signature = signedToken, Details = detailsObj });
             }
             else
             {
-                // 返回具体的错误信息和详情
-                object? errorDetails = null;
-                
-                if (result.ErrorCode != "INVALID" && result.LicenseInfo != null)
-                {
-                    var activatedCount = System.Linq.Queryable.Count(_context.Devices, d => d.LicenseId == result.LicenseInfo.Id);
-                    errorDetails = new
-                    {
-                        LicenseType = result.LicenseInfo.LicenseType,
-                        MaxDevices = result.LicenseInfo.MaxDevices,
-                        ActivatedCount = activatedCount,
-                        RemainingCount = result.LicenseInfo.MaxDevices - activatedCount < 0 ? 0 : result.LicenseInfo.MaxDevices - activatedCount
-                    };
-                }
-
                 return Unauthorized(new 
                 { 
                     Message = result.ErrorMessage, 
                     ErrorCode = result.ErrorCode,
-                    Details = errorDetails
+                    Details = detailsObj
                 });
             }
         }

@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using backend.Filters;
 
 namespace backend.Controllers
 {
@@ -136,6 +137,63 @@ namespace backend.Controllers
             var pubKey = _rsaKeyService.GetPublicKeyPem();
             return Ok(new { PublicKey = pubKey });
         }
+        /// <summary>
+        /// (测试专用) 重置激活次数
+        /// </summary>
+        [HttpPost("reset-activations")]
+        [SessionAuth] // 保护测试专用接口
+        public async Task<IActionResult> ResetActivations([FromBody] ResetActivationRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.LicenseKey))
+            {
+                return BadRequest(new { Message = "缺少授权码参数。" });
+            }
+
+            var success = await _licenseService.ResetActivationCountAsync(request.LicenseKey);
+            if (success)
+            {
+                return Ok(new { Message = "该授权码的激活次数已成功清零。" });
+            }
+            return BadRequest(new { Message = "找不到该授权码或重置失败。" });
+        }
+
+        /// <summary>
+        /// (测试专用) 获取授权码详细信息，不执行激活操作
+        /// </summary>
+        [HttpPost("info")]
+        [SessionAuth] // 保护测试专用接口
+        public async Task<IActionResult> GetLicenseInfo([FromBody] ResetActivationRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.LicenseKey))
+            {
+                return BadRequest(new { Message = "缺少授权码参数。" });
+            }
+
+            var license = await _licenseService.GetLicenseInfoAsync(request.LicenseKey);
+            if (license == null) return BadRequest(new { Message = "找不到该授权码。" });
+
+            var boundDevices = license.Devices != null 
+                ? license.Devices.Select(d => new { d.HardwareId, d.ActivatedAt }).Cast<object>().ToList() 
+                : new List<object>();
+            var activatedCount = boundDevices.Count;
+
+            var detailsObj = new
+            {
+                LicenseType = license.LicenseType,
+                MaxDevices = license.MaxDevices,
+                ActivatedCount = activatedCount,
+                RemainingCount = license.MaxDevices - activatedCount < 0 ? 0 : license.MaxDevices - activatedCount,
+                AllowDeviceTransfer = license.AllowDeviceTransfer,
+                Devices = boundDevices
+            };
+
+            return Ok(new { Details = detailsObj });
+        }
+    }
+
+    public class ResetActivationRequest
+    {
+        public string LicenseKey { get; set; } = string.Empty;
     }
 
     public class ActivationRequest

@@ -193,6 +193,41 @@ namespace backend.Services
         }
 
         /// <summary>
+        /// (仅供测试) 重置该授权码的激活次数
+        /// </summary>
+        public async Task<bool> ResetActivationCountAsync(string licenseKey)
+        {
+            var hashedKey = HashKey(licenseKey);
+            var license = await _context.Licenses.FirstOrDefaultAsync(l => l.LicenseKeyHash == hashedKey);
+            if (license == null) return false;
+
+            license.CurrentActivationCount = 0;
+            
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "ResetActivationCount",
+                Operator = "TestUtility",
+                Target = $"LicenseId:{license.Id}",
+                IsSuccess = true,
+                Details = "已清零当前激活次数"
+            });
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        /// <summary>
+        /// 获取授权码详情（不执行激活）
+        /// </summary>
+        public async Task<License?> GetLicenseInfoAsync(string plainLicenseKey)
+        {
+            var hashedKey = HashKey(plainLicenseKey);
+            return await _context.Licenses
+                .Include(l => l.Devices)
+                .FirstOrDefaultAsync(l => l.LicenseKeyHash == hashedKey);
+        }
+
+        /// <summary>
         /// 使用 SHA256 对激活码进行不可逆哈希
         /// </summary>
         private string HashKey(string input)

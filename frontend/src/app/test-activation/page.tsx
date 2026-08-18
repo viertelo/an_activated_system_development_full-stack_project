@@ -231,13 +231,74 @@ export default function TestActivationPage() {
     }
   };
 
+  const refreshLicenseInfo = async () => {
+    if (!licenseKey) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/License/info', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ licenseKey })
+      });
+      const data = await res.json();
+      if (res.ok && data.Details) {
+        setServerDetails(data.Details);
+        // 如果验签状态是 success，同时也更新 result 中的激活设备数，以便 UI 同步更新
+        if (result && verifyStatus === 'success') {
+           setResult((prev: any) => ({
+             ...prev,
+             ActivatedCount: data.Details.ActivatedCount,
+             RemainingCount: data.Details.RemainingCount
+           }));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to refresh license info", err);
+    }
+  };
+
+  const handleResetActivations = async () => {
+    if (!licenseKey) return;
+    setIsUnbinding(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/License/reset-activations', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ licenseKey })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.Message || '重置失败');
+      }
+      toast.success(data.Message || '重置成功');
+      
+      // 更新当前界面信息，而不是重新执行激活
+      await refreshLicenseInfo();
+    } catch (err: any) {
+      toast.error(err.message || '发生错误');
+    } finally {
+      setIsUnbinding(false);
+    }
+  };
+
   const handleUnbind = async (hwId: string) => {
     if (!hwId) return;
     setIsUnbinding(true);
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/device/deactivate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify({ hardwareId: hwId })
       });
       const data = await res.json();
@@ -245,8 +306,9 @@ export default function TestActivationPage() {
         throw new Error(data.Message || '解绑失败');
       }
       toast.success(data.Message || '解绑成功');
-      // 重新执行激活查询以刷新状态
-      handleActivate();
+      
+      // 更新当前界面信息，而不是重新执行激活
+      await refreshLicenseInfo();
     } catch (err: any) {
       toast.error(err.message || '解绑发生错误');
     } finally {
@@ -405,16 +467,35 @@ export default function TestActivationPage() {
                   </div>
                   
                   {/* 失败时展示的具体详情 (如有) */}
-                  {serverDetails && verifyStatus === 'failed' && (
-                    <div className="mt-4 bg-white dark:bg-gray-800 p-4 rounded-md border border-red-200 dark:border-red-800/50 shadow-sm">
-                      <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">设备限额详情</div>
-                      <div className="flex flex-wrap items-center gap-x-3 text-sm">
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">总配额: {serverDetails.maxDevices || serverDetails.MaxDevices} 台</span>
-                        <span className="text-gray-300 dark:text-gray-600">|</span>
-                        <span className="font-semibold text-green-600 dark:text-green-400">已激活: {serverDetails.activatedCount ?? serverDetails.ActivatedCount} 台</span>
-                        <span className="text-gray-300 dark:text-gray-600">|</span>
-                        <span className="font-semibold text-red-600 dark:text-red-400">剩余名额: {serverDetails.remainingCount ?? serverDetails.RemainingCount} 台</span>
-                      </div>
+                  {verifyStatus === 'failed' && (
+                    <div className="mt-4 space-y-4">
+                      {serverDetails && (
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-md border border-red-200 dark:border-red-800/50 shadow-sm">
+                          <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">设备限额详情</div>
+                          <div className="flex flex-wrap items-center gap-x-3 text-sm">
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">总配额: {serverDetails.maxDevices || serverDetails.MaxDevices} 台</span>
+                            <span className="text-gray-300 dark:text-gray-600">|</span>
+                            <span className="font-semibold text-green-600 dark:text-green-400">已激活: {serverDetails.activatedCount ?? serverDetails.ActivatedCount} 台</span>
+                            <span className="text-gray-300 dark:text-gray-600">|</span>
+                            <span className="font-semibold text-red-600 dark:text-red-400">剩余名额: {serverDetails.remainingCount ?? serverDetails.RemainingCount} 台</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {errorMsg.includes('次数限制') && (
+                        <div className="bg-orange-50 dark:bg-orange-900/30 p-4 rounded-md border border-orange-200 dark:border-orange-800">
+                           <h4 className="text-sm font-semibold text-orange-800 dark:text-orange-200">🛠️ 测试专用：突破激活次数限制</h4>
+                           <p className="text-xs mt-1 text-orange-700 dark:text-orange-300">
+                             正式商用时，激活码达到终生最大激活次数后将被永久作废。此处提供重置功能仅为方便您进行反复激活测试。
+                           </p>
+                           <button 
+                             onClick={handleResetActivations} 
+                             disabled={isUnbinding}
+                             className={`mt-3 inline-flex items-center text-xs font-medium bg-orange-100 hover:bg-orange-200 text-orange-700 dark:bg-orange-800 dark:text-orange-200 dark:hover:bg-orange-700 py-1.5 px-3 rounded shadow-sm border border-orange-300 dark:border-orange-600 transition-colors ${isUnbinding ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                             {isUnbinding ? '处理中...' : '清零该激活码的激活次数'}
+                           </button>
+                        </div>
+                      )}
                     </div>
                   )}
 

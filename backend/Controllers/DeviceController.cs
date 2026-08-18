@@ -1,12 +1,13 @@
 using System.Threading.Tasks;
 using backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using backend.Filters;
 
 namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    // [Authorize] // 警告：生产环境必须接入认证，或确保是由受信任的 Admin 系统/合法客户端调用
+    [SessionAuth] // 保护解绑接口，防止随意调用
     public class DeviceController : ControllerBase
     {
         private readonly LicenseService _licenseService;

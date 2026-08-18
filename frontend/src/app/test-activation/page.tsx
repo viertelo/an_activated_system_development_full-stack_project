@@ -55,7 +55,7 @@ export default function TestActivationPage() {
   }, []);
 
   useEffect(() => {
-    if (!hardwareId) setHardwareId(crypto.randomUUID());
+    if (!hardwareId) setHardwareId("TEST-" + crypto.randomUUID());
   }, []);
 
   const toggleTheme = () => {
@@ -69,7 +69,7 @@ export default function TestActivationPage() {
   };
 
   const randomizeHardwareId = () => {
-    setHardwareId(crypto.randomUUID());
+    setHardwareId("TEST-" + crypto.randomUUID());
     toast.success('硬件码已重新生成');
   };
 

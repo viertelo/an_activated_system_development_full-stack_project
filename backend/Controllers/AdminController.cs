@@ -202,7 +202,7 @@ namespace backend.Controllers
 
             var devices = await query
                 .Include(d => d.License)
-                .Where(d => d.License == null || d.License.LicenseType != "Test")
+                .Where(d => (d.License == null || d.License.LicenseType != "Test") && !d.HardwareId.StartsWith("TEST-"))
                 .AsNoTracking()
                 .OrderByDescending(d => d.ActivatedAt)
                 .Take(500)

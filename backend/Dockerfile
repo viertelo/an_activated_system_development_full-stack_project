@@ -1,14 +1,20 @@
 # 第一阶段：构建应用
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+# 禁用遥测，加快构建速度
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
+
 WORKDIR /src
 COPY ["backend.csproj", "./"]
+# (可选) 如果网络不好，可以使用华为云或阿里云的 NuGet 镜像
+# RUN dotnet nuget add source https://repo.huaweicloud.com/repository/nuget/v3/index.json -n HuaWei
 RUN dotnet restore "backend.csproj"
 COPY . .
 WORKDIR "/src/"
 RUN dotnet build "backend.csproj" -c Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "backend.csproj" -c Release -o /app/publish /p:UseAppHost=false
+# 增加 --no-restore 和 --no-build，防止 publish 时再次去联网下载和构建
+RUN dotnet publish "backend.csproj" -c Release -o /app/publish /p:UseAppHost=false --no-restore --no-build
 
 # 第二阶段：运行应用 (使用极其轻量的 Alpine 运行时镜像)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final

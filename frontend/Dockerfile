@@ -1,8 +1,13 @@
 # 第一阶段：构建前端静态页面
 FROM node:24-alpine AS builder
+
+# 禁用 Next.js 遥测，防止因网络问题导致构建卡顿
+ENV NEXT_TELEMETRY_DISABLED=1
+
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+# 配置淘宝/阿里云 NPM 镜像加速
+RUN npm config set registry https://registry.npmmirror.com && npm install
 COPY . .
 # Next.js 配置为输出纯静态 HTML (已在 next.config.ts 中配置 output: 'export')
 RUN npm run build

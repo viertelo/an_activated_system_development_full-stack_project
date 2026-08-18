@@ -94,6 +94,7 @@ namespace backend.Services
             }
 
             // 5. 检查当前绑定设备数量是否超限 及 换绑逻辑
+            string transferMessage = "";
             var currentDeviceCount = await _context.Devices.CountAsync(d => d.LicenseId == license.Id);
             if (currentDeviceCount >= license.MaxDevices)
             {
@@ -116,6 +117,7 @@ namespace backend.Services
                             IsSuccess = true,
                             Details = $"自动解绑老设备 {oldestDevice.HardwareId}"
                         });
+                        transferMessage = $"激活成功！由于当前已达最大设备绑定上限，系统已自动为您踢出最早激活的设备 ({oldestDevice.HardwareId})。";
                         // 移除后继续下面的绑定新设备流程
                     }
                 }
@@ -158,6 +160,11 @@ namespace backend.Services
             });
 
             await _context.SaveChangesAsync();
+
+            if (!string.IsNullOrEmpty(transferMessage))
+            {
+                return (true, "TRANSFERRED", transferMessage, license);
+            }
 
             return (true, "", "", license);
         }

@@ -12,6 +12,7 @@ export default function TestActivationPage() {
   const [result, setResult] = useState<any>(null);
   const [verifyStatus, setVerifyStatus] = useState<'none' | 'success' | 'failed'>('none');
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [serverDetails, setServerDetails] = useState<any>(null);
   const [isUnbinding, setIsUnbinding] = useState(false);
   const [offlineToken, setOfflineToken] = useState('');
@@ -130,7 +131,7 @@ export default function TestActivationPage() {
     }
   };
 
-  const performLocalVerify = async (signatureStr: string) => {
+  const performLocalVerify = async (signatureStr: string, successMsgArg?: string) => {
     if (!signatureStr || !signatureStr.includes('.')) {
       throw new Error("签名格式不正确，应包含 '.'");
     }
@@ -140,7 +141,8 @@ export default function TestActivationPage() {
     
     if (isValid) {
       setVerifyStatus('success');
-      toast.success('验签成功！');
+      toast.success(successMsgArg || '验签成功！');
+      setSuccessMsg(successMsgArg || '验签成功，本地证书合法。');
       const jsonStr = decodeURIComponent(escape(window.atob(payloadBase64)));
       const payloadObj = JSON.parse(jsonStr);
       setResult(payloadObj);
@@ -163,7 +165,8 @@ export default function TestActivationPage() {
     setResult(null);
 
     try {
-      await performLocalVerify(offlineToken);
+      toast.success('开始本地验签...');
+      await performLocalVerify(offlineToken, '离线验签成功！');
     } catch (err: any) {
       setVerifyStatus('failed');
       setErrorMsg(err.message || '发生错误');
@@ -182,6 +185,7 @@ export default function TestActivationPage() {
     setLoading(true);
     setVerifyStatus('none');
     setErrorMsg('');
+    setSuccessMsg('');
     setServerDetails(null);
     setResult(null);
 
@@ -215,7 +219,7 @@ export default function TestActivationPage() {
 
       toast.success('接口请求成功，开始本地验签...');
       const signatureStr = data.Signature || data.signature;
-      await performLocalVerify(signatureStr);
+      await performLocalVerify(signatureStr, data.Message || data.message);
 
     } catch (err: any) {
       setVerifyStatus('failed');
@@ -416,9 +420,16 @@ export default function TestActivationPage() {
 
                   {/* 成功时展示的具体详情 */}
                   {result && verifyStatus === 'success' && (
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-gray-800 p-4 rounded-md border border-green-200 dark:border-green-800/50 shadow-sm">
-                      <div>
-                        <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">授权类型</div>
+                    <div className="mt-4">
+                      {successMsg && (
+                        <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded border border-green-200 dark:border-green-800 flex items-start gap-2">
+                          <span>✅</span>
+                          <span className="text-sm font-medium">{successMsg}</span>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-gray-800 p-4 rounded-md border border-green-200 dark:border-green-800/50 shadow-sm">
+                        <div>
+                          <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">授权类型</div>
                         <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{result.LicenseType === 'Permanent' ? '永久授权 (Permanent)' : result.LicenseType}</div>
                       </div>
                       <div>
@@ -454,16 +465,35 @@ export default function TestActivationPage() {
                           </div>
                         </div>
                       )}
+                      </div>
                     </div>
                   )}
 
-                  {/* 解绑 / 换绑 提示及列表区 */}
-                  {serverDetails && (serverDetails.allowDeviceTransfer || serverDetails.AllowDeviceTransfer) && (serverDetails.devices || serverDetails.Devices)?.length > 0 && (
-                    <div className="mt-6 bg-blue-50 dark:bg-blue-900/30 p-4 rounded-md border border-blue-200 dark:border-blue-800">
+                  {/* 解绑 / 换绑 提示及列表区 (测试专用) */}
+                  {serverDetails && (serverDetails.devices || serverDetails.Devices)?.length > 0 && (
+                    <div className={`mt-6 p-4 rounded-md border ${
+                      (serverDetails.allowDeviceTransfer || serverDetails.AllowDeviceTransfer) 
+                        ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' 
+                        : 'bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800'
+                    }`}>
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-200">💡 支持设备换绑</h4>
-                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">此授权码允许反激活。如果达到上限，您可以解绑以下任一设备来释放名额。</p>
+                          <h4 className={`text-sm font-semibold ${
+                            (serverDetails.allowDeviceTransfer || serverDetails.AllowDeviceTransfer) 
+                              ? 'text-blue-800 dark:text-blue-200' 
+                              : 'text-orange-800 dark:text-orange-200'
+                          }`}>
+                            {(serverDetails.allowDeviceTransfer || serverDetails.AllowDeviceTransfer) ? '💡 支持自动换绑' : '🛠️ 测试专用：强制设备重置'}
+                          </h4>
+                          <p className={`text-xs mt-1 ${
+                            (serverDetails.allowDeviceTransfer || serverDetails.AllowDeviceTransfer) 
+                              ? 'text-blue-700 dark:text-blue-300' 
+                              : 'text-orange-700 dark:text-orange-300'
+                          }`}>
+                            {(serverDetails.allowDeviceTransfer || serverDetails.AllowDeviceTransfer) 
+                              ? '此授权码允许反激活。当名额满时会自动踢出最早的设备。您也可以在下方手动解绑以释放名额。' 
+                              : '【注意】此授权码禁止换绑！正式商用时，客户端一旦满额将彻底无法激活。此处提供解绑功能仅为方便您循环测试触发上限的逻辑。'}
+                          </p>
                         </div>
                       </div>
                       

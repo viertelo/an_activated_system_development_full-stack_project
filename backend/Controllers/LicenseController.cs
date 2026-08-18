@@ -91,8 +91,9 @@ namespace backend.Controllers
                 };
 
                 var signedToken = _rsaKeyService.SignData(payload);
+                var successMessage = string.IsNullOrEmpty(result.ErrorMessage) ? "激活成功。" : result.ErrorMessage;
                 // 成功时一并返回 Details，供前端判断是否展示设备管理
-                return Ok(new { Message = "激活成功。", Signature = signedToken, Details = detailsObj });
+                return Ok(new { Message = successMessage, Signature = signedToken, Details = detailsObj });
             }
             else
             {

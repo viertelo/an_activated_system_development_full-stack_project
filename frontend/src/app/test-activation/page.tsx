@@ -11,6 +11,27 @@ export default function TestActivationPage() {
   const [result, setResult] = useState<any>(null);
   const [verifyStatus, setVerifyStatus] = useState<'none' | 'success' | 'failed'>('none');
   const [errorMsg, setErrorMsg] = useState('');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isDark = document.documentElement.classList.contains('dark') || window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(isDark ? 'dark' : 'light');
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('dark');
+      setTheme('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      setTheme('light');
+    }
+  };
 
   // Generate a mock hardware ID on load
   useEffect(() => {
@@ -148,8 +169,25 @@ export default function TestActivationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
       <div className="max-w-3xl mx-auto space-y-8">
+        <div className="flex justify-end">
+          <button
+            onClick={toggleTheme}
+            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 bg-white dark:bg-gray-800 rounded-md shadow-sm border border-gray-200 dark:border-gray-700 transition-colors"
+          >
+            {theme === 'light' ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            )}
+          </button>
+        </div>
+
         <div className="text-center">
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
             客户端激活模拟测试
@@ -249,26 +287,26 @@ export default function TestActivationPage() {
                   
                   {/* 成功时展示的具体详情 */}
                   {result && verifyStatus === 'success' && (
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/60 dark:bg-black/20 p-4 rounded-md border border-green-100 dark:border-green-900">
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-gray-800 p-4 rounded-md border border-green-200 dark:border-green-800/50 shadow-sm">
                       <div>
-                        <div className="text-xs uppercase tracking-wider opacity-70">授权类型</div>
-                        <div className="mt-1 font-medium">{result.LicenseType === 'Permanent' ? '永久授权 (Permanent)' : result.LicenseType}</div>
+                        <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">授权类型</div>
+                        <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{result.LicenseType === 'Permanent' ? '永久授权 (Permanent)' : result.LicenseType}</div>
                       </div>
                       <div>
-                        <div className="text-xs uppercase tracking-wider opacity-70">到期时间</div>
-                        <div className="mt-1 font-medium">{result.ExpiresAt ? new Date(result.ExpiresAt).toLocaleString() : '无限制'}</div>
+                        <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">到期时间</div>
+                        <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{result.ExpiresAt ? new Date(result.ExpiresAt).toLocaleString() : '无限制'}</div>
                       </div>
                       <div>
-                        <div className="text-xs uppercase tracking-wider opacity-70">支持最多设备数</div>
-                        <div className="mt-1 font-medium">{result.MaxDevices} 台</div>
+                        <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">支持最多设备数</div>
+                        <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{result.MaxDevices} 台</div>
                       </div>
                       <div>
-                        <div className="text-xs uppercase tracking-wider opacity-70">首次激活时间</div>
-                        <div className="mt-1 font-medium">{new Date(result.ActivatedAt).toLocaleString()}</div>
+                        <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">首次激活时间</div>
+                        <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{new Date(result.ActivatedAt).toLocaleString()}</div>
                       </div>
                       <div className="sm:col-span-2">
-                        <div className="text-xs uppercase tracking-wider opacity-70">绑定设备ID</div>
-                        <div className="mt-1 font-medium break-all">{result.HardwareId}</div>
+                        <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">绑定设备ID</div>
+                        <div className="mt-1 font-mono text-sm text-gray-900 dark:text-gray-100 break-all bg-gray-50 dark:bg-gray-900 p-2 rounded border border-gray-100 dark:border-gray-700">{result.HardwareId}</div>
                       </div>
                     </div>
                   )}

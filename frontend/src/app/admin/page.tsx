@@ -143,7 +143,7 @@ function LicenseDetailTable({ apiFetch, setActiveTab }: { apiFetch: (url: string
                     <td className="px-6 py-4 text-sm font-mono text-gray-900 dark:text-gray-300">
                       {item.activatedDevices && item.activatedDevices.length > 0 ? (
                         <div className="flex flex-col space-y-1">
-                          {item.activatedDevices.map((d: string, i: number) => <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded break-all">{d}</span>)}
+                          {item.activatedDevices.map((d: string, i: number) => <span key={i} className={`px-2 py-1 rounded break-all ${d.startsWith('TEST-') ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 font-bold border border-red-200 dark:border-red-800' : 'bg-gray-100 dark:bg-gray-700'}`}>{d}</span>)}
                         </div>
                       ) : (
                         <span className="text-gray-400 italic">暂无设备激活</span>

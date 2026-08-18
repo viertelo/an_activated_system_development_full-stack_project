@@ -510,7 +510,7 @@ export default function TestActivationPage() {
                     {((queryResult.devices ?? queryResult.Devices) || []).length > 0 ? (
                       ((queryResult.devices ?? queryResult.Devices)).map((dev: any, idx: number) => (
                         <div key={idx} className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex justify-between items-center text-sm shadow-sm">
-                          <span className="font-mono text-gray-600 dark:text-gray-300 truncate max-w-[60%]" title={dev.hardwareId || dev.HardwareId}>{dev.hardwareId || dev.HardwareId}</span>
+                          <span className={`font-mono text-sm truncate max-w-[60%] ${(dev.hardwareId || dev.HardwareId).startsWith('TEST-') ? 'text-red-600 dark:text-red-400 font-bold' : 'text-gray-600 dark:text-gray-300'}`} title={dev.hardwareId || dev.HardwareId}>{dev.hardwareId || dev.HardwareId}</span>
                           <span className="text-xs text-gray-400">{new Date(dev.activatedAt || dev.ActivatedAt).toLocaleString()}</span>
                         </div>
                       ))
@@ -654,7 +654,7 @@ export default function TestActivationPage() {
                         </div>
                         <div className="sm:col-span-2">
                           <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">当前绑定设备ID</div>
-                          <div className="mt-1 font-mono text-sm text-gray-900 dark:text-gray-100 break-all bg-gray-50 dark:bg-gray-900 p-2 rounded border border-gray-100 dark:border-gray-700">{onlineResult.HardwareId}</div>
+                          <div className={`mt-1 font-mono text-sm break-all p-2 rounded border ${onlineResult.HardwareId.startsWith('TEST-') ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 font-bold' : 'bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-gray-100 dark:border-gray-700'}`}>{onlineResult.HardwareId}</div>
                         </div>
                         {onlineResult.LicenseType === 'Subscription' && onlineResult.ExpiresAt && (
                           <div className="sm:col-span-2 mt-2">
@@ -704,7 +704,7 @@ export default function TestActivationPage() {
                           <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 shadow-sm gap-3">
                             <div className="overflow-hidden">
                               <div className="text-xs text-gray-500 dark:text-gray-400">硬件 ID</div>
-                              <div className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title={dev.hardwareId || dev.HardwareId}>
+                              <div className={`font-mono text-sm font-medium truncate ${(dev.hardwareId || dev.HardwareId).startsWith('TEST-') ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`} title={dev.hardwareId || dev.HardwareId}>
                                 {dev.hardwareId || dev.HardwareId}
                               </div>
                               <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">

@@ -11,6 +11,7 @@ export default function TestActivationPage() {
   const [result, setResult] = useState<any>(null);
   const [verifyStatus, setVerifyStatus] = useState<'none' | 'success' | 'failed'>('none');
   const [errorMsg, setErrorMsg] = useState('');
+  const [errorDetails, setErrorDetails] = useState<any>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
@@ -104,8 +105,10 @@ export default function TestActivationPage() {
     }
 
     setLoading(true);
-    setResult(null);
     setVerifyStatus('none');
+    setErrorMsg('');
+    setErrorDetails(null);
+    setResult(null);
 
     try {
       // 1. 调用激活接口
@@ -128,7 +131,9 @@ export default function TestActivationPage() {
       }
 
       if (!res.ok) {
-        throw new Error(data.Message || data.message || '激活失败');
+        const err: any = new Error(data.Message || data.message || '激活失败');
+        err.details = data.Details || data.details;
+        throw err;
       }
 
       toast.success('接口请求成功，开始本地验签...');
@@ -162,6 +167,7 @@ export default function TestActivationPage() {
     } catch (err: any) {
       setVerifyStatus('failed');
       setErrorMsg(err.message || '发生错误');
+      setErrorDetails(err.details || null);
       toast.error(err.message || '发生错误');
     } finally {
       setLoading(false);
@@ -285,6 +291,20 @@ export default function TestActivationPage() {
                     )}
                   </div>
                   
+                  {/* 失败时展示的具体详情 (如有) */}
+                  {errorDetails && verifyStatus === 'failed' && (
+                    <div className="mt-4 bg-white dark:bg-gray-800 p-4 rounded-md border border-red-200 dark:border-red-800/50 shadow-sm">
+                      <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">设备限额详情</div>
+                      <div className="flex flex-wrap items-center gap-x-3 text-sm">
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">总配额: {errorDetails.maxDevices || errorDetails.MaxDevices} 台</span>
+                        <span className="text-gray-300 dark:text-gray-600">|</span>
+                        <span className="font-semibold text-green-600 dark:text-green-400">已激活: {errorDetails.activatedCount ?? errorDetails.ActivatedCount} 台</span>
+                        <span className="text-gray-300 dark:text-gray-600">|</span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">剩余名额: {errorDetails.remainingCount ?? errorDetails.RemainingCount} 台</span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* 成功时展示的具体详情 */}
                   {result && verifyStatus === 'success' && (
                     <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-gray-800 p-4 rounded-md border border-green-200 dark:border-green-800/50 shadow-sm">
@@ -296,9 +316,15 @@ export default function TestActivationPage() {
                         <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">到期时间</div>
                         <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{result.ExpiresAt ? new Date(result.ExpiresAt).toLocaleString() : '无限制'}</div>
                       </div>
-                      <div>
-                        <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">支持最多设备数</div>
-                        <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{result.MaxDevices} 台</div>
+                      <div className="sm:col-span-2">
+                        <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">设备激活情况</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 text-sm">
+                          <span className="font-semibold text-gray-900 dark:text-gray-100">总配额: {result.MaxDevices} 台</span>
+                          <span className="text-gray-300 dark:text-gray-600">|</span>
+                          <span className="font-semibold text-green-600 dark:text-green-400">已激活: {result.ActivatedCount !== undefined ? result.ActivatedCount : '?'} 台</span>
+                          <span className="text-gray-300 dark:text-gray-600">|</span>
+                          <span className="font-semibold text-blue-600 dark:text-blue-400">剩余名额: {result.RemainingCount !== undefined ? result.RemainingCount : '?'} 台</span>
+                        </div>
                       </div>
                       <div>
                         <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">首次激活时间</div>

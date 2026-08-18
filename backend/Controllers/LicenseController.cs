@@ -50,11 +50,12 @@ namespace backend.Controllers
                 return BadRequest("参数不完整。");
             }
 
-            // 验证用户身份及归属权
             var result = await _licenseService.ActivateDeviceAsync(request.LicenseKey, request.HardwareId);
 
             if (result.IsSuccess && result.LicenseInfo != null)
             {
+                var activatedCount = System.Linq.Queryable.Count(_context.Devices, d => d.LicenseId == result.LicenseInfo.Id);
+
                 // 激活成功，生成离线 RSA 证书
                 var payload = new
                 {
@@ -62,7 +63,9 @@ namespace backend.Controllers
                     LicenseType = result.LicenseInfo.LicenseType,
                     ExpiresAt = result.LicenseInfo.ExpirationDate,
                     ActivatedAt = System.DateTime.UtcNow,
-                    MaxDevices = result.LicenseInfo.MaxDevices
+                    MaxDevices = result.LicenseInfo.MaxDevices,
+                    ActivatedCount = activatedCount,
+                    RemainingCount = result.LicenseInfo.MaxDevices - activatedCount < 0 ? 0 : result.LicenseInfo.MaxDevices - activatedCount
                 };
 
                 var signedToken = _rsaKeyService.SignData(payload);
@@ -70,9 +73,27 @@ namespace backend.Controllers
             }
             else
             {
-                // 激活失败
-                // 绝对安全策略：模糊化错误信息，不让黑客知道是“激活码错误”还是“设备数量达标”。
-                return Unauthorized(new { Message = "授权失败，请检查凭据或稍后重试。" });
+                // 返回具体的错误信息和详情
+                object? errorDetails = null;
+                
+                if (result.ErrorCode != "INVALID" && result.LicenseInfo != null)
+                {
+                    var activatedCount = System.Linq.Queryable.Count(_context.Devices, d => d.LicenseId == result.LicenseInfo.Id);
+                    errorDetails = new
+                    {
+                        LicenseType = result.LicenseInfo.LicenseType,
+                        MaxDevices = result.LicenseInfo.MaxDevices,
+                        ActivatedCount = activatedCount,
+                        RemainingCount = result.LicenseInfo.MaxDevices - activatedCount < 0 ? 0 : result.LicenseInfo.MaxDevices - activatedCount
+                    };
+                }
+
+                return Unauthorized(new 
+                { 
+                    Message = result.ErrorMessage, 
+                    ErrorCode = result.ErrorCode,
+                    Details = errorDetails
+                });
             }
         }
 

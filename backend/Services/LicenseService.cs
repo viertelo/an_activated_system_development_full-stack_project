@@ -24,8 +24,8 @@ namespace backend.Services
         /// </summary>
         /// <param name="plainLicenseKey">用户输入的原始激活码</param>
         /// <param name="hardwareId">设备的硬件指纹</param>
-        /// <returns>是否激活成功</returns>
-        public async Task<(bool IsSuccess, License? LicenseInfo)> ActivateDeviceAsync(string plainLicenseKey, string hardwareId)
+        /// <returns>是否激活成功，错误代码，错误信息，许可证对象</returns>
+        public async Task<(bool IsSuccess, string ErrorCode, string ErrorMessage, License? LicenseInfo)> ActivateDeviceAsync(string plainLicenseKey, string hardwareId)
         {
             // 1. 哈希处理（严禁明文比对）
             var hashedKey = HashKey(plainLicenseKey);
@@ -47,7 +47,7 @@ namespace backend.Services
                     Details = "尝试使用不存在或已吊销的激活码"
                 });
                 await _context.SaveChangesAsync();
-                return (false, null);
+                return (false, "INVALID", "无效的激活码或该激活码已被吊销", null);
             }
 
             // 邮箱验证已移除：允许最终用户在电商购买后直接使用激活码激活，无需提供经销商的邮箱
@@ -65,7 +65,7 @@ namespace backend.Services
                     Details = "尝试使用已过期的激活码"
                 });
                 await _context.SaveChangesAsync();
-                return (false, null);
+                return (false, "EXPIRED", "该激活码已过期", license);
             }
 
             // 3. 检查设备是否已经绑定
@@ -75,7 +75,7 @@ namespace backend.Services
             if (existingDevice != null)
             {
                 // 设备已激活过，直接允许通过
-                return (true, license);
+                return (true, "", "", license);
             }
 
             // 4. 检查总激活次数限制
@@ -90,7 +90,7 @@ namespace backend.Services
                     Details = $"已达到终生最大激活次数限制 ({license.MaxActivations}次)"
                 });
                 await _context.SaveChangesAsync();
-                return (false, null);
+                return (false, "MAX_ACTIVATIONS_REACHED", $"已达到终生最大激活次数限制 ({license.MaxActivations}次)", license);
             }
 
             // 5. 检查当前绑定设备数量是否超限 及 换绑逻辑
@@ -131,7 +131,7 @@ namespace backend.Services
                         Details = "超过最大设备限制且不允许换绑"
                     });
                     await _context.SaveChangesAsync();
-                    return (false, null);
+                    return (false, "DEVICE_LIMIT_REACHED", "绑定的设备数量已达上限", license);
                 }
             }
 
@@ -159,7 +159,7 @@ namespace backend.Services
 
             await _context.SaveChangesAsync();
 
-            return (true, license);
+            return (true, "", "", license);
         }
 
         /// <summary>

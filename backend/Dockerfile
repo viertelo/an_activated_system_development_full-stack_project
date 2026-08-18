@@ -10,11 +10,11 @@ COPY ["backend.csproj", "./"]
 RUN dotnet restore "backend.csproj"
 COPY . .
 WORKDIR "/src/"
-RUN dotnet build "backend.csproj" -c Release -o /app/build
 
 FROM build AS publish
-# 增加 --no-restore 和 --no-build，防止 publish 时再次去联网下载和构建
-RUN dotnet publish "backend.csproj" -c Release -o /app/publish /p:UseAppHost=false --no-restore --no-build
+# 之前分离了 build 和 publish 导致 --no-build 找不到默认输出目录
+# 最优做法：直接在 publish 中执行编译（加上 --no-restore 避免重复还原）
+RUN dotnet publish "backend.csproj" -c Release -o /app/publish /p:UseAppHost=false --no-restore
 
 # 第二阶段：运行应用 (使用极其轻量的 Alpine 运行时镜像)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final

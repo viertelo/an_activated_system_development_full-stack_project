@@ -13,7 +13,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     // 如果 Nginx 和后端在同一服务器或 Docker 容器内，清除 KnownNetworks，允许所有代理传递 X-Forwarded-For
-    options.KnownNetworks.Clear();
+    options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
 

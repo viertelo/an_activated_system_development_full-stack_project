@@ -8,6 +8,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace backend.Filters
 {
+    /// <summary>
+    /// 自定义鉴权拦截器
+    /// 安全原则：此拦截器强制要求请求头中必须携带 X-Session-Token 和 X-User-Id。
+    /// 主要用于保护超级管理员后台的 API 以及供测试专用的特权接口（如清零激活次数、解绑设备）。
+    /// 它通过比对数据库中 user.CurrentSessionToken 实现“单点登录/多地互踢”功能，
+    /// 从而防止恶意用户或外网爬虫直接调用危险的商业规则篡改接口。
+    /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
     public class SessionAuthAttribute : ActionFilterAttribute
     {

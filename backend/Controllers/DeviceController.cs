@@ -7,7 +7,10 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [SessionAuth] // 保护解绑接口，防止随意调用
+    // [SessionAuth] 保护解绑接口，防止随意调用。
+    // 安全原则：解绑 (Deactivate) 属于特权操作。在正常的商用模式下，一旦设备配额满，
+    // 若未开启自动换绑，是不允许客户端自行调用解绑的。此 API 仅开放给带有效 Admin Token 的请求（如测试页或后台）。
+    [SessionAuth] 
     public class DeviceController : ControllerBase
     {
         private readonly LicenseService _licenseService;

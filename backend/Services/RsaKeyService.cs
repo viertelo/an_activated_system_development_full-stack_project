@@ -57,6 +57,10 @@ namespace backend.Services
 
         /// <summary>
         /// 使用私钥对待签数据进行签名
+        /// 架构设计：这是整个商业防破解的核心。离线生成的凭证由 payloadBase64 和 signatureBase64 组成。
+        /// 注意：此处使用原生的 JsonSerializer.Serialize(payload) 而不传入任何配置，
+        /// 意味着匿名对象的属性名将严格保持 PascalCase（首字母大写），如 LicenseType。
+        /// 前端在通过 base64 解码并 JSON.parse 后，需按 PascalCase 读取属性。
         /// </summary>
         public string SignData(object payload)
         {

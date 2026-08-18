@@ -57,6 +57,9 @@ export default function TestActivationPage() {
     toast.success('硬件码已重新生成');
   };
 
+  // 专用于测试页面的鉴权请求封装：
+  // 测试页面上的很多特权操作（如强行解绑、强制重置次数、直接获取公钥）
+  // 必须通过带有 [SessionAuth] 的特权 API，否则会被 401 拦截。
   const apiFetch = async (url: string, options: RequestInit = {}) => {
     const sessionToken = localStorage.getItem('sessionToken');
     const userStr = localStorage.getItem('user');
@@ -206,6 +209,8 @@ export default function TestActivationPage() {
 
     try {
       // 1. 调用激活接口
+      // 商业逻辑：此接口是公开的，只验证 licenseKey 和 hardwareId，通过后签发 RSA 凭证。
+      // 它不受 SessionAuth 保护，任何人只要有合法的授权码均可调用。
       const res = await fetch('/api/License/activate', {
         method: 'POST',
         headers: {
@@ -249,6 +254,8 @@ export default function TestActivationPage() {
   const refreshLicenseInfo = async () => {
     if (!licenseKey) return;
     try {
+      // 兼容性保障：这里使用了 apiFetch (会自动携带 X-Session-Token)。
+      // 因为 /api/License/info 带有 [SessionAuth] 保护，普通 fetch 会被拦截 (401 Unauthorized)。
       const res = await apiFetch('/api/License/info', {
         method: 'POST',
         headers: { 
@@ -257,6 +264,9 @@ export default function TestActivationPage() {
         body: JSON.stringify({ licenseKey })
       });
       const data = await res.json();
+      
+      // 数据容错处理：当经过 ASP.NET Core 的全局配置时，属性为 camelCase (data.details)。
+      // 若未经过全局配置（如直接返回匿名对象），则为 PascalCase (data.Details)。
       const details = data.details || data.Details;
       if (res.ok && details) {
         setServerDetails(details);

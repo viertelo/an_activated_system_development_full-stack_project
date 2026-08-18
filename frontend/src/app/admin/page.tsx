@@ -449,6 +449,9 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState<{ userId: string, role: string } | null>(null);
 
+  // 全局 API 拦截器：所有受保护的请求都必须通过 apiFetch。
+  // 它会自动从 localStorage 提取 sessionToken 和 userId，
+  // 注入到 X-Session-Token 和 X-User-Id 请求头中，以通过后端的 SessionAuth 拦截器校验。
   const apiFetch = async (url: string, options: RequestInit = {}) => {
     const sessionToken = localStorage.getItem('sessionToken');
     const userStr = localStorage.getItem('user');

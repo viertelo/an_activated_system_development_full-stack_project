@@ -139,6 +139,9 @@ namespace backend.Controllers
         }
         /// <summary>
         /// (测试专用) 重置激活次数
+        /// 安全原则：此接口会篡改商业规则（将授权码的累计使用次数归零），绝对不可暴露给普通终端用户。
+        /// 通过加上 [SessionAuth] 特性，强制要求调用方必须携带合法的超级管理员令牌（X-Session-Token）。
+        /// 即使黑客知道了此 API 路径，没有令牌也无法越权调用。
         /// </summary>
         [HttpPost("reset-activations")]
         [SessionAuth] // 保护测试专用接口
@@ -159,6 +162,10 @@ namespace backend.Controllers
 
         /// <summary>
         /// (测试专用) 获取授权码详细信息，不执行激活操作
+        /// 业务逻辑：返回当前激活码的限额情况和已绑定的设备列表。
+        /// 安全原则：同样受 [SessionAuth] 保护，避免普通用户嗅探其他人的授权码绑定信息。
+        /// 注：返回值通过 ASP.NET Core 默认序列化器返回，属性名会变为驼峰式 (camelCase)，
+        /// 前端需注意适配，如 data.details。
         /// </summary>
         [HttpPost("info")]
         [SessionAuth] // 保护测试专用接口

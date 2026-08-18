@@ -35,6 +35,8 @@
 - 📱 **硬件级无密码认证 (Passkey & WebAuthn)**：管理员后台除了支持传统账号密码外，全面支持现代化 **Passkey (通行密钥/指纹/面容)** 登录。将内部管理账户被盗风险降至物理级别的最低点。
 - 🛡️ **账号防爆破与防并发 (Concurrent Login Prevention)**：支持同一超级管理员账号多地登录**自动互踢**，严格保证 Session 唯一性。内置密码试错防爆破系统，连续输入错误 3 次即锁定账号 15 分钟。
 - 📊 **高性能数据大盘与风控安全中心 (Analytics & Security)**：内置图形化管理员看板 (`/admin`)，实时双轨呈现 **RSA 公钥快速查看** 与 **异常拦截攻击量**。支持一秒生成千张授权码，并提供专属的**风控安全中心**，全方位追踪管理员操作（含 Passkey 登录 IP 捕获）与恶意拦截日志。
+- 🛡️ **严格的安全环境隔离与特权测试面板**：专门打造独立的 `/test-activation` 页面供商业测试使用，提供一键解绑、随机硬件ID、强制重置已激活次数等特权功能。所有特权 API (`ResetActivations`, `Deactivate` 等) 均由 `[SessionAuth]` 层层把守，与正式商用的 `Activate` 接口物理和逻辑分离，坚决防止越权滥用。
+- 🧩 **序列化兼容性保障 (Case-Insensitive Serialization)**：前端通信库经过全面强化，对于服务端混合响应（如 `PascalCase` 和 `camelCase` 混合情况）提供无感自适应。完全规避了 WebAPI 与前端 JSON.parse() 在异构交互中的反序列化异常。
 - 🚀 **极致轻量化与全栈性能优化**：前端采用 Next.js 16 (Static Export) 静态构建，无缝适配 Nginx；后端采用极小体积的 .NET Alpine 镜像，底层集成 **IMemoryCache 内存级高速缓存** 及 Entity Framework 无追踪查询优化，应对高并发抢购/大批量激活稳如泰山。
 - 🐳 **容器化黑盒防御**：通过 Docker Compose 部署，数据库与后端 API 的端口被完全封锁在虚拟内网中。唯一对外的窗口由 Nginx 严格把守，并强制全链路 HTTPS。
 

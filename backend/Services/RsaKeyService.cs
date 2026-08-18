@@ -51,7 +51,8 @@ namespace backend.Services
         /// </summary>
         public string GetPublicKeyPem()
         {
-            return File.ReadAllText(_publicKeyPath);
+            // 始终导出 SPKI 格式（-----BEGIN PUBLIC KEY-----），以兼容前端 Web Crypto API
+            return _rsa.ExportSubjectPublicKeyInfoPem();
         }
 
         /// <summary>

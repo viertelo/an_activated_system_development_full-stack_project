@@ -10,6 +10,7 @@ export default function TestActivationPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [verifyStatus, setVerifyStatus] = useState<'none' | 'success' | 'failed'>('none');
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Generate a mock hardware ID on load
   useEffect(() => {
@@ -52,9 +53,9 @@ export default function TestActivationPage() {
         true,
         ["verify"]
       );
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      throw new Error("公钥解析失败，请检查是否为有效的 RSA 公钥 PEM");
+      throw new Error(e.message || "公钥解析失败，请检查是否为有效的 RSA 公钥 PEM");
     }
   };
 
@@ -76,16 +77,8 @@ export default function TestActivationPage() {
   };
 
   const handleActivate = async () => {
-    if (!publicKey.trim()) {
-      toast.error('请填写公钥');
-      return;
-    }
-    if (!licenseKey.trim()) {
-      toast.error('请填写激活码');
-      return;
-    }
-    if (!hardwareId.trim()) {
-      toast.error('请填写设备标识(HardwareId)');
+    if (!publicKey.trim() || !licenseKey.trim() || !hardwareId.trim()) {
+      toast.error('请填写完整信息');
       return;
     }
 
@@ -141,10 +134,13 @@ export default function TestActivationPage() {
         setResult(payloadObj);
       } else {
         setVerifyStatus('failed');
+        setErrorMsg('验签失败：数据可能被篡改或公钥不匹配');
         toast.error('验签失败：数据可能被篡改或公钥不匹配');
       }
 
     } catch (err: any) {
+      setVerifyStatus('failed');
+      setErrorMsg(err.message || '发生错误');
       toast.error(err.message || '发生错误');
     } finally {
       setLoading(false);
@@ -219,67 +215,68 @@ export default function TestActivationPage() {
               {loading ? '正在激活...' : '执行激活与验签'}
             </button>
           </div>
-        </div>
 
-        {/* 结果展示区 */}
-        {(verifyStatus !== 'none' || result) && (
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 space-y-4">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white border-b pb-2 dark:border-gray-700">
-              激活结果
-            </h2>
-
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500 dark:text-gray-400">本地验签状态：</span>
-              {verifyStatus === 'success' && <span className="text-green-600 font-bold">验证通过，数据可信</span>}
-              {verifyStatus === 'failed' && <span className="text-red-600 font-bold">验证失败，签名不匹配</span>}
+          {/* 激活结果提示框 (嵌入在激活框内) */}
+          {verifyStatus !== 'none' && (
+            <div className={`mt-6 p-4 rounded-md border ${
+              verifyStatus === 'success' 
+                ? 'bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-800' 
+                : 'bg-red-50 border-red-200 dark:bg-red-900/30 dark:border-red-800'
+            }`}>
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  {verifyStatus === 'success' ? (
+                    <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <div className="ml-3 w-full">
+                  <h3 className={`text-sm font-medium ${verifyStatus === 'success' ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                    {verifyStatus === 'success' ? '激活与验签成功' : '激活失败'}
+                  </h3>
+                  <div className={`mt-2 text-sm ${verifyStatus === 'success' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                    {verifyStatus === 'success' ? (
+                      <p>本地公钥已成功验证服务端签发的凭证，数据未被篡改，可安全信任。</p>
+                    ) : (
+                      <p>{errorMsg}</p>
+                    )}
+                  </div>
+                  
+                  {/* 成功时展示的具体详情 */}
+                  {result && verifyStatus === 'success' && (
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/60 dark:bg-black/20 p-4 rounded-md border border-green-100 dark:border-green-900">
+                      <div>
+                        <div className="text-xs uppercase tracking-wider opacity-70">授权类型</div>
+                        <div className="mt-1 font-medium">{result.LicenseType === 'Permanent' ? '永久授权 (Permanent)' : result.LicenseType}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase tracking-wider opacity-70">到期时间</div>
+                        <div className="mt-1 font-medium">{result.ExpiresAt ? new Date(result.ExpiresAt).toLocaleString() : '无限制'}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase tracking-wider opacity-70">支持最多设备数</div>
+                        <div className="mt-1 font-medium">{result.MaxDevices} 台</div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase tracking-wider opacity-70">首次激活时间</div>
+                        <div className="mt-1 font-medium">{new Date(result.ActivatedAt).toLocaleString()}</div>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <div className="text-xs uppercase tracking-wider opacity-70">绑定设备ID</div>
+                        <div className="mt-1 font-medium break-all">{result.HardwareId}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-
-            {result && verifyStatus === 'success' && (
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-md border dark:border-gray-700">
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">授权类型</div>
-                  <div className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {result.LicenseType === 'Permanent' ? '永久授权 (Permanent)' : result.LicenseType}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">到期时间</div>
-                  <div className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {result.ExpiresAt ? new Date(result.ExpiresAt).toLocaleString() : '无限制'}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">支持最多设备数</div>
-                  <div className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {result.MaxDevices} 台
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">绑定设备ID</div>
-                  <div className="mt-1 text-sm font-medium text-gray-900 dark:text-white break-all">
-                    {result.HardwareId}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">首次激活时间</div>
-                  <div className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {new Date(result.ActivatedAt).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {result && verifyStatus === 'success' && (
-              <div className="mt-4 text-xs text-gray-400">
-                注：本次显示的“支持最多设备数”及“到期时间”均来自于经过 RSA 签名保护的数据块。由于签名无法伪造，客户端可绝对信任此信息。
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

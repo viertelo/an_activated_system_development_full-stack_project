@@ -1056,6 +1056,7 @@ export default function AdminDashboard() {
                       <option value="Permanent">永久版 (Permanent)</option>
                       <option value="Subscription">按年/月订阅 (Subscription)</option>
                       <option value="Trial">试用版 (Trial)</option>
+                      <option value="Test">测试专用 (Test)</option>
                     </select>
                   </div>
 

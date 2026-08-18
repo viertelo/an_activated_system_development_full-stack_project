@@ -17,6 +17,13 @@ export default function TestActivationPage() {
   const [isUnbinding, setIsUnbinding] = useState(false);
   const [offlineToken, setOfflineToken] = useState('');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  
+  // 新增查询专用的 state
+  const [queryLicenseKey, setQueryLicenseKey] = useState('');
+  const [queryLoading, setQueryLoading] = useState(false);
+  const [queryResult, setQueryResult] = useState<any>(null);
+  const [queryError, setQueryError] = useState('');
+  
   const router = useRouter();
 
   useEffect(() => {
@@ -338,6 +345,38 @@ export default function TestActivationPage() {
     }
   };
 
+  const handleQueryStatus = async () => {
+    if (!queryLicenseKey.trim()) {
+      toast.error('请输入需要查询的激活码');
+      return;
+    }
+    setQueryLoading(true);
+    setQueryError('');
+    setQueryResult(null);
+
+    try {
+      const res = await apiFetch('/api/License/info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ licenseKey: queryLicenseKey })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || data.Message || '查询失败或找不到该激活码');
+      }
+
+      const details = data.details || data.Details;
+      setQueryResult(details);
+      toast.success('查询成功');
+    } catch (err: any) {
+      setQueryError(err.message || '查询发生错误');
+      toast.error(err.message || '查询发生错误');
+    } finally {
+      setQueryLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
       <div className="max-w-3xl mx-auto space-y-8">
@@ -365,6 +404,110 @@ export default function TestActivationPage() {
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             在网页端模拟客户端的激活过程，包括接口调用和本地 RSA 验签。
           </p>
+        </div>
+
+        {/* 激活码状态查询模块 */}
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 space-y-6">
+          <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">🔍 激活码状态查询</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              仅提供只读查询功能，可一目了然查看正式商用和测试用激活码的设备数量、剩余次数等详细状态。
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              要查询的激活码
+            </label>
+            <div className="mt-1 flex space-x-2">
+              <input
+                type="text"
+                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 text-gray-900 dark:text-white p-2 border"
+                placeholder="请输入激活码"
+                value={queryLicenseKey}
+                onChange={(e) => setQueryLicenseKey(e.target.value)}
+              />
+              <button
+                onClick={handleQueryStatus}
+                disabled={queryLoading}
+                className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${queryLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {queryLoading ? '查询中...' : '查询状态'}
+              </button>
+            </div>
+          </div>
+
+          {queryError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded text-sm dark:bg-red-900/30 dark:text-red-200 dark:border-red-800">
+              {queryError}
+            </div>
+          )}
+
+          {queryResult && (
+            <div className="mt-4 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-md font-bold text-gray-900 dark:text-gray-100">查询结果明细</h3>
+                <span className={`px-2 py-1 text-xs font-bold rounded ${queryResult.isActive ?? queryResult.IsActive ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'}`}>
+                  {(queryResult.isActive ?? queryResult.IsActive) ? '状态：正常可用' : '状态：已被吊销/禁用'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">授权类型</div>
+                  <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
+                    {(queryResult.licenseType ?? queryResult.LicenseType) === 'Permanent' ? '永久授权 (Permanent)' : (queryResult.licenseType ?? queryResult.LicenseType)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">到期时间</div>
+                  <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
+                    {(queryResult.expirationDate ?? queryResult.ExpirationDate) ? new Date((queryResult.expirationDate ?? queryResult.ExpirationDate)).toLocaleString() : '无限制'}
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">设备绑定配额</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 text-sm">
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">总设备配额: {queryResult.maxDevices ?? queryResult.MaxDevices} 台</span>
+                    <span className="text-gray-300 dark:text-gray-600">|</span>
+                    <span className="font-semibold text-green-600 dark:text-green-400">已激活设备: {queryResult.activatedCount ?? queryResult.ActivatedCount} 台</span>
+                    <span className="text-gray-300 dark:text-gray-600">|</span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">剩余可绑设备: {queryResult.remainingCount ?? queryResult.RemainingCount} 台</span>
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">总体激活次数限制</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 text-sm">
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">最大允许激活次数: {(queryResult.maxActivations ?? queryResult.MaxActivations) === 0 ? '无限制' : (queryResult.maxActivations ?? queryResult.MaxActivations) + ' 次'}</span>
+                    <span className="text-gray-300 dark:text-gray-600">|</span>
+                    <span className="font-semibold text-orange-600 dark:text-orange-400">历史已使用激活: {queryResult.currentActivationCount ?? queryResult.CurrentActivationCount} 次</span>
+                    <span className="text-gray-300 dark:text-gray-600">|</span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">剩余激活机会: {queryResult.remainingActivations ?? queryResult.RemainingActivations}</span>
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">是否允许自动换绑</div>
+                  <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
+                    {(queryResult.allowDeviceTransfer ?? queryResult.AllowDeviceTransfer) ? '✅ 允许 (超出设备数量将自动解绑最旧设备)' : '❌ 不允许 (绑定设备后不可自动换绑)'}
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">已绑定的设备明细</div>
+                  <div className="mt-2 space-y-2">
+                    {((queryResult.devices ?? queryResult.Devices) || []).length > 0 ? (
+                      ((queryResult.devices ?? queryResult.Devices)).map((dev: any, idx: number) => (
+                        <div key={idx} className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex justify-between items-center text-sm shadow-sm">
+                          <span className="font-mono text-gray-600 dark:text-gray-300 truncate max-w-[60%]" title={dev.hardwareId || dev.HardwareId}>{dev.hardwareId || dev.HardwareId}</span>
+                          <span className="text-xs text-gray-400">{new Date(dev.activatedAt || dev.ActivatedAt).toLocaleString()}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-gray-500 italic">尚未绑定任何设备</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 space-y-6">

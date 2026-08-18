@@ -190,6 +190,11 @@ namespace backend.Controllers
                 MaxDevices = license.MaxDevices,
                 ActivatedCount = activatedCount,
                 RemainingCount = license.MaxDevices - activatedCount < 0 ? 0 : license.MaxDevices - activatedCount,
+                MaxActivations = license.MaxActivations,
+                CurrentActivationCount = license.CurrentActivationCount,
+                RemainingActivations = license.MaxActivations == 0 ? "不限次数" : (license.MaxActivations - license.CurrentActivationCount).ToString(),
+                ExpirationDate = license.ExpirationDate,
+                IsActive = license.IsActive,
                 AllowDeviceTransfer = license.AllowDeviceTransfer,
                 Devices = boundDevices
             };
